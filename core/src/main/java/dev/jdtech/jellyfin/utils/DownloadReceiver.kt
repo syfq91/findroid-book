@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.Intent
 import dagger.hilt.android.AndroidEntryPoint
 import dev.jdtech.jellyfin.database.ServerDatabaseDao
-import dev.jdtech.jellyfin.models.FindroidItem
 import dev.jdtech.jellyfin.models.toFindroidBook
 import dev.jdtech.jellyfin.models.toFindroidEpisode
 import dev.jdtech.jellyfin.models.toFindroidMovie
@@ -73,28 +72,20 @@ class DownloadReceiver : BroadcastReceiver() {
                             Timber.w(
                                 "Download failed or move failed for source ${source.id} (itemId=${source.itemId}, status=$downloadStatus, reason=$failureReason)"
                             )
-                            val items = mutableListOf<FindroidItem>()
-                            items.addAll(
-                                database.getMovies().map {
-                                    it.toFindroidMovie(database, repository.getUserId())
-                                }
-                            )
-                            items.addAll(
-                                database.getEpisodes().map {
-                                    it.toFindroidEpisode(database, repository.getUserId())
-                                }
-                            )
-                            items.addAll(
-                                database.getBooks().map {
-                                    it.toFindroidBook(database, repository.getUserId())
-                                }
-                            )
-
-                            items
-                                .firstOrNull { it.id == source.itemId }
-                                ?.let {
-                                    downloader.deleteItem(it, source.toFindroidSource(database))
-                                }
+                            val userId = repository.getUserId()
+                            val item =
+                                database
+                                    .findMovie(source.itemId)
+                                    ?.toFindroidMovie(database, userId)
+                                    ?: database
+                                        .findEpisode(source.itemId)
+                                        ?.toFindroidEpisode(database, userId)
+                                    ?: database
+                                        .findBook(source.itemId)
+                                        ?.toFindroidBook(database, userId)
+                            item?.let {
+                                downloader.deleteItem(it, source.toFindroidSource(database))
+                            }
                         }
                     } else {
                         val mediaStream = database.getMediaStreamByDownloadId(id)

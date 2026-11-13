@@ -145,6 +145,9 @@ interface ServerDatabaseDao {
 
     @Query("SELECT * FROM movies ORDER BY name ASC") suspend fun getMovies(): List<FindroidMovieDto>
 
+    /** Nullable counterpart of [getMovie] for lookups where the row may be absent. */
+    @Query("SELECT * FROM movies WHERE id = :id") suspend fun findMovie(id: UUID): FindroidMovieDto?
+
     @Query("SELECT * FROM movies WHERE serverId = :serverId ORDER BY name ASC")
     suspend fun getMoviesByServerId(serverId: String): List<FindroidMovieDto>
 
@@ -200,6 +203,10 @@ interface ServerDatabaseDao {
     @Query("SELECT * FROM seasons") suspend fun getSeasons(): List<FindroidSeasonDto>
 
     @Query("SELECT * FROM episodes") suspend fun getEpisodes(): List<FindroidEpisodeDto>
+
+    /** Nullable counterpart of [getEpisode] for lookups where the row may be absent. */
+    @Query("SELECT * FROM episodes WHERE id = :id")
+    suspend fun findEpisode(id: UUID): FindroidEpisodeDto?
 
     @Query("SELECT * FROM userdata WHERE itemId = :itemId AND userId = :userId")
     suspend fun getUserData(itemId: UUID, userId: UUID): FindroidUserDataDto?
