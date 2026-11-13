@@ -586,8 +586,7 @@ class JellyfinRepositoryImpl(
 
     override fun getDownloadUrl(itemId: UUID): String {
         val baseUrl = getBaseUrl().trimEnd('/')
-        val token = jellyfinApi.api.accessToken.orEmpty()
-        return "$baseUrl/Items/$itemId/Download?api_key=$token"
+        return "$baseUrl/Items/$itemId/Download"
     }
 
     override fun getAuthorizationHeader(): String? {
