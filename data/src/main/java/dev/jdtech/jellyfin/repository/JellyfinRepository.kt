@@ -132,6 +132,12 @@ interface JellyfinRepository {
     fun getAccessToken(): String?
 
     /**
+     * Returns the size of the item's download from the server, or `null` when it cannot be
+     * determined. Used for items such as books whose size is absent from the item metadata.
+     */
+    suspend fun getDownloadSize(itemId: UUID): Long?
+
+    /**
      * Opens an authenticated stream to the item's download using an `Authorization` header, rather
      * than embedding the access token in the URL. Callers that can send headers should prefer this
      * over [getDownloadUrl]; the token in a URL can leak into logs and error messages.

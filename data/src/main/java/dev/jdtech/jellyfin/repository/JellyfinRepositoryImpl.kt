@@ -605,6 +605,36 @@ class JellyfinRepositoryImpl(
         return jellyfinApi.api.accessToken
     }
 
+    override suspend fun getDownloadSize(itemId: UUID): Long? =
+        withContext(Dispatchers.IO) {
+            val baseUrl = getBaseUrl().trimEnd('/')
+            val authorization = getAuthorizationHeader() ?: return@withContext null
+            try {
+                val connection =
+                    (URL("$baseUrl/Items/$itemId/Download").openConnection()
+                            as HttpURLConnection)
+                        .apply {
+                            requestMethod = "HEAD"
+                            connectTimeout = 15000
+                            readTimeout = 15000
+                            setRequestProperty("Authorization", authorization)
+                            connect()
+                        }
+                try {
+                    if (connection.responseCode in 200..299) {
+                        connection.contentLengthLong.takeIf { it > 0 }
+                    } else {
+                        null
+                    }
+                } finally {
+                    connection.disconnect()
+                }
+            } catch (e: Exception) {
+                Timber.w(e, "Could not determine the download size of $itemId")
+                null
+            }
+        }
+
     override suspend fun openDownloadStream(itemId: UUID): InputStream =
         withContext(Dispatchers.IO) {
             val baseUrl = getBaseUrl().trimEnd('/')

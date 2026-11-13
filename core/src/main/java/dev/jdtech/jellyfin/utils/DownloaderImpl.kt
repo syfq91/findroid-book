@@ -83,18 +83,26 @@ class DownloaderImpl(
             val downloadsDir = File(storageLocation, "downloads").apply { mkdirs() }
             val path = Uri.fromFile(File(downloadsDir, "${item.id}.${source.id}.download"))
             val stats = StatFs(storageLocation.path)
-            if (source.size > 0 && stats.availableBytes < source.size) {
+            val downloadSize =
+                if (source.size > 0) source.size
+                else jellyfinRepository.getDownloadSize(item.id) ?: 0L
+            val resolvedSource = if (source.size <= 0 && downloadSize > 0) {
+                source.copy(size = downloadSize)
+            } else {
+                source
+            }
+            if (downloadSize > 0 && stats.availableBytes < downloadSize) {
                 return@coroutineScope Pair(
                     -1,
                     UiText.StringResource(
                         CoreR.string.not_enough_storage,
-                        Formatter.formatFileSize(context, source.size),
+                        Formatter.formatFileSize(context, downloadSize),
                         Formatter.formatFileSize(context, stats.availableBytes),
                     ),
                 )
             }
             val request =
-                DownloadManager.Request(source.path.toUri())
+                DownloadManager.Request(resolvedSource.path.toUri())
                     .setTitle(item.name)
                     .setAllowedOverMetered(
                         appPreferences.getValue(appPreferences.downloadOverMobileData)
@@ -129,13 +137,13 @@ class DownloaderImpl(
                 startImagesDownloaderById(item.seasonId)
             }
 
-            val sourceDto = source.toFindroidSourceDto(item.id, path.path.orEmpty())
+            val sourceDto = resolvedSource.toFindroidSourceDto(item.id, path.path.orEmpty())
 
             database.insertSource(sourceDto.copy(downloadId = downloadId))
             database.insertUserData(item.toFindroidUserDataDto(jellyfinRepository.getUserId()))
 
             if (downloadable.hasVideoExtras) {
-                downloadExternalMediaStreams(item, source, storageIndex)
+                downloadExternalMediaStreams(item, resolvedSource, storageIndex)
                 segments.forEach { database.insertSegment(it.toFindroidSegmentsDto(item.id)) }
             }
 
