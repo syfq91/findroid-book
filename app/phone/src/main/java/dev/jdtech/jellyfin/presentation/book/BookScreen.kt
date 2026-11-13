@@ -1,5 +1,6 @@
 package dev.jdtech.jellyfin.presentation.book
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,10 +14,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -34,7 +37,9 @@ import dev.jdtech.jellyfin.core.presentation.downloader.DownloaderEvent
 import dev.jdtech.jellyfin.core.presentation.downloader.DownloaderState
 import dev.jdtech.jellyfin.core.presentation.downloader.DownloaderViewModel
 import dev.jdtech.jellyfin.presentation.book.components.BookButtonsBar
-import dev.jdtech.jellyfin.presentation.components.DownloadErrorSnackbar
+import dev.jdtech.jellyfin.presentation.components.DeleteServerErrorEffect
+import dev.jdtech.jellyfin.presentation.components.DownloadErrorEffect
+import dev.jdtech.jellyfin.presentation.components.MessageSnackbarHost
 import dev.jdtech.jellyfin.presentation.film.components.ItemHeader
 import dev.jdtech.jellyfin.presentation.film.components.ItemTopBar
 import dev.jdtech.jellyfin.presentation.film.components.OverviewText
@@ -77,6 +82,13 @@ fun BookScreen(
         }
     }
 
+    LaunchedEffect(state.deletedFromServer) {
+        if (state.deletedFromServer) {
+            Toast.makeText(context, CoreR.string.deleted_from_server, Toast.LENGTH_SHORT).show()
+            navigateBack()
+        }
+    }
+
     BookScreenLayout(
         state = state,
         downloaderState = downloaderState,
@@ -111,6 +123,7 @@ private fun BookScreenLayout(
     onHomeClick: () -> Unit,
 ) {
     val safePadding = rememberSafePadding()
+    val snackbarHostState = remember { SnackbarHostState() }
     val paddingStart = safePadding.start + MaterialTheme.spacings.default
     val paddingEnd = safePadding.end + MaterialTheme.spacings.default
     val paddingBottom = safePadding.bottom + MaterialTheme.spacings.default
@@ -220,6 +233,9 @@ private fun BookScreenLayout(
                         onDownloadDeleteClick = {
                             onDownloaderAction(DownloaderAction.DeleteDownload(book))
                         },
+                        canDeleteFromServer = state.canDeleteFromServer,
+                        isDeletingFromServer = state.isDeletingFromServer,
+                        onDeleteFromServerClick = { onAction(BookAction.DeleteFromServer) },
                     )
 
                     Spacer(Modifier.height(MaterialTheme.spacings.default))
@@ -267,8 +283,11 @@ private fun BookScreenLayout(
             )
         }
 
-        DownloadErrorSnackbar(
-            downloaderState = downloaderState,
+        DownloadErrorEffect(downloaderState = downloaderState, hostState = snackbarHostState)
+        DeleteServerErrorEffect(error = state.deleteServerError, hostState = snackbarHostState)
+
+        MessageSnackbarHost(
+            hostState = snackbarHostState,
             modifier =
                 Modifier.align(Alignment.BottomCenter)
                     .padding(bottom = safePadding.bottom + MaterialTheme.spacings.medium),

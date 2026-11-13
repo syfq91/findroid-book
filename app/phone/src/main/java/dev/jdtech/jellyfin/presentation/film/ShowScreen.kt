@@ -22,10 +22,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,6 +49,8 @@ import dev.jdtech.jellyfin.film.presentation.show.ShowAction
 import dev.jdtech.jellyfin.film.presentation.show.ShowState
 import dev.jdtech.jellyfin.film.presentation.show.ShowViewModel
 import dev.jdtech.jellyfin.models.FindroidItem
+import dev.jdtech.jellyfin.presentation.components.DeleteServerErrorEffect
+import dev.jdtech.jellyfin.presentation.components.MessageSnackbarHost
 import dev.jdtech.jellyfin.presentation.film.components.ActorsRow
 import dev.jdtech.jellyfin.presentation.film.components.Direction
 import dev.jdtech.jellyfin.presentation.film.components.InfoText
@@ -79,6 +83,13 @@ fun ShowScreen(
 
     LaunchedEffect(true) { viewModel.loadShow(showId = showId) }
 
+    LaunchedEffect(state.deletedFromServer) {
+        if (state.deletedFromServer) {
+            Toast.makeText(context, CoreR.string.deleted_from_server, Toast.LENGTH_SHORT).show()
+            navigateBack()
+        }
+    }
+
     ShowScreenLayout(
         state = state,
         onAction = { action ->
@@ -110,6 +121,8 @@ fun ShowScreen(
 @Composable
 private fun ShowScreenLayout(state: ShowState, onAction: (ShowAction) -> Unit) {
     val safePadding = rememberSafePadding()
+
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val paddingStart = safePadding.start + MaterialTheme.spacings.default
     val paddingEnd = safePadding.end + MaterialTheme.spacings.default
@@ -209,6 +222,9 @@ private fun ShowScreenLayout(state: ShowState, onAction: (ShowAction) -> Unit) {
                         onDownloadDeleteClick = {},
                         modifier = Modifier.fillMaxWidth(),
                         canPlay = state.seasons.isNotEmpty(),
+                        canDeleteFromServer = state.canDeleteFromServer,
+                        isDeletingFromServer = state.isDeletingFromServer,
+                        onDeleteFromServerClick = { onAction(ShowAction.DeleteFromServer) },
                     )
                     Spacer(Modifier.height(MaterialTheme.spacings.small))
                     OverviewText(text = show.overview, maxCollapsedLines = 3)
@@ -294,6 +310,15 @@ private fun ShowScreenLayout(state: ShowState, onAction: (ShowAction) -> Unit) {
             hasHomeButton = true,
             onBackClick = { onAction(ShowAction.OnBackClick) },
             onHomeClick = { onAction(ShowAction.OnHomeClick) },
+        )
+
+        DeleteServerErrorEffect(error = state.deleteServerError, hostState = snackbarHostState)
+
+        MessageSnackbarHost(
+            hostState = snackbarHostState,
+            modifier =
+                Modifier.align(Alignment.BottomCenter)
+                    .padding(bottom = safePadding.bottom + MaterialTheme.spacings.medium),
         )
     }
 }

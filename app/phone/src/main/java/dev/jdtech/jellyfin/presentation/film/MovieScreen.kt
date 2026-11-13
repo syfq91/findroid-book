@@ -18,10 +18,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -45,7 +47,9 @@ import dev.jdtech.jellyfin.core.presentation.dummy.dummyVideoMetadata
 import dev.jdtech.jellyfin.film.presentation.movie.MovieAction
 import dev.jdtech.jellyfin.film.presentation.movie.MovieState
 import dev.jdtech.jellyfin.film.presentation.movie.MovieViewModel
-import dev.jdtech.jellyfin.presentation.components.DownloadErrorSnackbar
+import dev.jdtech.jellyfin.presentation.components.DeleteServerErrorEffect
+import dev.jdtech.jellyfin.presentation.components.DownloadErrorEffect
+import dev.jdtech.jellyfin.presentation.components.MessageSnackbarHost
 import dev.jdtech.jellyfin.presentation.film.components.ActorsRow
 import dev.jdtech.jellyfin.presentation.film.components.ExtraInfoText
 import dev.jdtech.jellyfin.presentation.film.components.InfoText
@@ -97,6 +101,13 @@ fun MovieScreen(
         }
     }
 
+    LaunchedEffect(state.deletedFromServer) {
+        if (state.deletedFromServer) {
+            Toast.makeText(context, CoreR.string.deleted_from_server, Toast.LENGTH_SHORT).show()
+            navigateBack()
+        }
+    }
+
     MovieScreenLayout(
         state = state,
         downloaderState = downloaderState,
@@ -135,6 +146,8 @@ private fun MovieScreenLayout(
     onDownloaderAction: (DownloaderAction) -> Unit,
 ) {
     val safePadding = rememberSafePadding()
+
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val paddingStart = safePadding.start + MaterialTheme.spacings.default
     val paddingEnd = safePadding.end + MaterialTheme.spacings.default
@@ -245,6 +258,9 @@ private fun MovieScreenLayout(
                         onDownloadDeleteClick = {
                             onDownloaderAction(DownloaderAction.DeleteDownload(movie))
                         },
+                        canDeleteFromServer = state.canDeleteFromServer,
+                        isDeletingFromServer = state.isDeletingFromServer,
+                        onDeleteFromServerClick = { onAction(MovieAction.DeleteFromServer) },
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Spacer(Modifier.height(MaterialTheme.spacings.small))
@@ -281,8 +297,11 @@ private fun MovieScreenLayout(
             onHomeClick = { onAction(MovieAction.OnHomeClick) },
         )
 
-        DownloadErrorSnackbar(
-            downloaderState = downloaderState,
+        DownloadErrorEffect(downloaderState = downloaderState, hostState = snackbarHostState)
+        DeleteServerErrorEffect(error = state.deleteServerError, hostState = snackbarHostState)
+
+        MessageSnackbarHost(
+            hostState = snackbarHostState,
             modifier =
                 Modifier.align(Alignment.BottomCenter)
                     .padding(bottom = safePadding.bottom + MaterialTheme.spacings.medium),

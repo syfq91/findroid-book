@@ -6,8 +6,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.jdtech.jellyfin.film.domain.VideoMetadataParser
 import dev.jdtech.jellyfin.models.FindroidItemPerson
 import dev.jdtech.jellyfin.models.FindroidMovie
+import dev.jdtech.jellyfin.models.FindroidSourceType
 import dev.jdtech.jellyfin.repository.JellyfinRepository
 import dev.jdtech.jellyfin.settings.domain.AppPreferences
+import dev.jdtech.jellyfin.utils.Downloader
 import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
@@ -16,6 +18,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jellyfin.sdk.model.api.PersonKind
+import timber.log.Timber
 
 @HiltViewModel
 class MovieViewModel
@@ -24,6 +27,7 @@ constructor(
     private val repository: JellyfinRepository,
     private val appPreferences: AppPreferences,
     private val videoMetadataParser: VideoMetadataParser,
+    private val downloads: Downloader,
 ) : ViewModel() {
     private val _state = MutableStateFlow(MovieState())
     val state = _state.asStateFlow()
@@ -40,6 +44,7 @@ constructor(
                 val director = getDirector(movie)
                 val writers = getWriters(movie)
                 val displayExtraInfo = appPreferences.getValue(appPreferences.displayExtraInfo)
+                val canDelete = runCatching { repository.canDeleteMedia() }.getOrDefault(false)
                 _state.emit(
                     _state.value.copy(
                         movie = movie,
@@ -48,6 +53,7 @@ constructor(
                         director = director,
                         writers = writers,
                         displayExtraInfo = displayExtraInfo,
+                        canDeleteFromServer = canDelete,
                     )
                 )
             } catch (e: Exception) {
@@ -103,7 +109,32 @@ constructor(
                     loadMovie(movieId)
                 }
             }
+            is MovieAction.DeleteFromServer -> deleteFromServer()
             else -> Unit
+        }
+    }
+
+    private fun deleteFromServer() {
+        viewModelScope.launch {
+            _state.emit(_state.value.copy(isDeletingFromServer = true, deleteServerError = null))
+            try {
+                repository.deleteServerItem(movieId)
+                _state.value.movie?.let { item ->
+                    item.sources
+                        .firstOrNull {
+                            it.type == FindroidSourceType.LOCAL && !it.path.endsWith(".download")
+                        }
+                        ?.let { source ->
+                            runCatching { downloads.deleteItem(item, source) }
+                                .onFailure { Timber.w(it, "Failed to remove local download") }
+                        }
+                }
+                _state.emit(
+                    _state.value.copy(isDeletingFromServer = false, deletedFromServer = true)
+                )
+            } catch (e: Exception) {
+                _state.emit(_state.value.copy(isDeletingFromServer = false, deleteServerError = e))
+            }
         }
     }
 }

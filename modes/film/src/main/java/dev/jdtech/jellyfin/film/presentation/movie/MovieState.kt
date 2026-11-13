@@ -12,4 +12,8 @@ data class MovieState(
     val writers: List<FindroidItemPerson> = emptyList(),
     val displayExtraInfo: Boolean = false,
     val error: Exception? = null,
+    val canDeleteFromServer: Boolean = false,
+    val isDeletingFromServer: Boolean = false,
+    val deleteServerError: Exception? = null,
+    val deletedFromServer: Boolean = false,
 )

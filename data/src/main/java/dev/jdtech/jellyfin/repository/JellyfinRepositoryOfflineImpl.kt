@@ -324,6 +324,12 @@ class JellyfinRepositoryOfflineImpl(
         }
     }
 
+    override suspend fun deleteServerItem(itemId: UUID) {
+        throw IOException("Deleting from the server is unavailable in offline mode")
+    }
+
+    override suspend fun canDeleteMedia(): Boolean = false
+
     override fun getBaseUrl(): String {
         return ""
     }

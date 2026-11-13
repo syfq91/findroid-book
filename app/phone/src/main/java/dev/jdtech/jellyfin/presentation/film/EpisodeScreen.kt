@@ -1,6 +1,7 @@
 package dev.jdtech.jellyfin.presentation.film
 
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,10 +20,12 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -47,7 +50,9 @@ import dev.jdtech.jellyfin.core.presentation.dummy.dummyVideoMetadata
 import dev.jdtech.jellyfin.film.presentation.episode.EpisodeAction
 import dev.jdtech.jellyfin.film.presentation.episode.EpisodeState
 import dev.jdtech.jellyfin.film.presentation.episode.EpisodeViewModel
-import dev.jdtech.jellyfin.presentation.components.DownloadErrorSnackbar
+import dev.jdtech.jellyfin.presentation.components.DeleteServerErrorEffect
+import dev.jdtech.jellyfin.presentation.components.DownloadErrorEffect
+import dev.jdtech.jellyfin.presentation.components.MessageSnackbarHost
 import dev.jdtech.jellyfin.presentation.film.components.ActorsRow
 import dev.jdtech.jellyfin.presentation.film.components.ExtraInfoText
 import dev.jdtech.jellyfin.presentation.film.components.ItemButtonsBar
@@ -101,6 +106,13 @@ fun EpisodeScreen(
         }
     }
 
+    LaunchedEffect(state.deletedFromServer) {
+        if (state.deletedFromServer) {
+            Toast.makeText(context, CoreR.string.deleted_from_server, Toast.LENGTH_SHORT).show()
+            navigateBack()
+        }
+    }
+
     EpisodeScreenLayout(
         state = state,
         downloaderState = downloaderState,
@@ -133,6 +145,8 @@ private fun EpisodeScreenLayout(
     onDownloaderAction: (DownloaderAction) -> Unit,
 ) {
     val safePadding = rememberSafePadding()
+
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val paddingStart = safePadding.start + MaterialTheme.spacings.default
     val paddingEnd = safePadding.end + MaterialTheme.spacings.default
@@ -248,6 +262,9 @@ private fun EpisodeScreenLayout(
                         onDownloadDeleteClick = {
                             onDownloaderAction(DownloaderAction.DeleteDownload(episode))
                         },
+                        canDeleteFromServer = state.canDeleteFromServer,
+                        isDeletingFromServer = state.isDeletingFromServer,
+                        onDeleteFromServerClick = { onAction(EpisodeAction.DeleteFromServer) },
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Spacer(Modifier.height(MaterialTheme.spacings.small))
@@ -301,8 +318,11 @@ private fun EpisodeScreenLayout(
             }
         }
 
-        DownloadErrorSnackbar(
-            downloaderState = downloaderState,
+        DownloadErrorEffect(downloaderState = downloaderState, hostState = snackbarHostState)
+        DeleteServerErrorEffect(error = state.deleteServerError, hostState = snackbarHostState)
+
+        MessageSnackbarHost(
+            hostState = snackbarHostState,
             modifier =
                 Modifier.align(Alignment.BottomCenter)
                     .padding(bottom = safePadding.bottom + MaterialTheme.spacings.medium),

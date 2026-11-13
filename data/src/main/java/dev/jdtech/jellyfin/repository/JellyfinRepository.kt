@@ -119,6 +119,10 @@ interface JellyfinRepository {
 
     suspend fun markAsUnplayed(itemId: UUID)
 
+    suspend fun deleteServerItem(itemId: UUID)
+
+    suspend fun canDeleteMedia(): Boolean
+
     fun getBaseUrl(): String
 
     fun getDownloadUrl(itemId: UUID): String

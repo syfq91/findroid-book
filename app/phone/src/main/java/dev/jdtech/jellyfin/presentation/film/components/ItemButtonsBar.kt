@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
@@ -21,7 +22,10 @@ import dev.jdtech.jellyfin.core.presentation.downloader.DownloaderState
 import dev.jdtech.jellyfin.core.presentation.dummy.dummyEpisode
 import dev.jdtech.jellyfin.models.FindroidItem
 import dev.jdtech.jellyfin.models.FindroidMovie
+import dev.jdtech.jellyfin.models.FindroidSeason
 import dev.jdtech.jellyfin.models.FindroidShow
+import dev.jdtech.jellyfin.models.isDownloaded
+import dev.jdtech.jellyfin.presentation.components.DeleteServerButton
 import dev.jdtech.jellyfin.presentation.components.DownloadButton
 import dev.jdtech.jellyfin.presentation.components.DownloadDialogs
 import dev.jdtech.jellyfin.presentation.components.FavoriteButton
@@ -43,6 +47,9 @@ fun ItemButtonsBar(
     modifier: Modifier = Modifier,
     downloaderState: DownloaderState? = null,
     canPlay: Boolean = true,
+    canDeleteFromServer: Boolean = false,
+    isDeletingFromServer: Boolean = false,
+    onDeleteFromServerClick: () -> Unit = {},
 ) {
     val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
 
@@ -58,6 +65,21 @@ fun ItemButtonsBar(
         }
 
     val downloadControls = rememberDownloadControlsState()
+
+    val deleteServerMessage =
+        when (item) {
+            is FindroidShow ->
+                stringResource(
+                    CoreR.string.delete_from_server_container_message,
+                    stringResource(CoreR.string.delete_from_server_show),
+                )
+            is FindroidSeason ->
+                stringResource(
+                    CoreR.string.delete_from_server_container_message,
+                    stringResource(CoreR.string.delete_from_server_season),
+                )
+            else -> stringResource(CoreR.string.delete_from_server_message)
+        }
 
     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
         Column(
@@ -122,6 +144,14 @@ fun ItemButtonsBar(
                     downloaderState = downloaderState,
                     onDownloadClick = onDownloadClick,
                     onDownloadCancelClick = onDownloadCancelClick,
+                )
+                DeleteServerButton(
+                    canDeleteFromServer = canDeleteFromServer,
+                    isDeletingFromServer = isDeletingFromServer,
+                    isDownloaded = item.isDownloaded(),
+                    message = deleteServerMessage,
+                    downloadInProgress = downloaderState?.isDownloading == true,
+                    onDeleteFromServerClick = onDeleteFromServerClick,
                 )
             }
         }

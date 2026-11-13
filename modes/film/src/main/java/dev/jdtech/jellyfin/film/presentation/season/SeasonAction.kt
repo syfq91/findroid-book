@@ -21,4 +21,6 @@ sealed interface SeasonAction {
     data class NavigateToItem(val item: FindroidItem) : SeasonAction
 
     data class NavigateToSeries(val seriesId: UUID) : SeasonAction
+
+    data object DeleteFromServer : SeasonAction
 }

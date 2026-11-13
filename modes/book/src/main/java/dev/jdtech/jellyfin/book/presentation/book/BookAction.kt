@@ -12,4 +12,6 @@ sealed interface BookAction {
     data object OnBackClick : BookAction
 
     data object OnReadClick : BookAction
+
+    data object DeleteFromServer : BookAction
 }

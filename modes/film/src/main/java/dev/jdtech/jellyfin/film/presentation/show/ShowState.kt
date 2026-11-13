@@ -13,4 +13,8 @@ data class ShowState(
     val director: FindroidItemPerson? = null,
     val writers: List<FindroidItemPerson> = emptyList(),
     val error: Exception? = null,
+    val canDeleteFromServer: Boolean = false,
+    val isDeletingFromServer: Boolean = false,
+    val deleteServerError: Exception? = null,
+    val deletedFromServer: Boolean = false,
 )

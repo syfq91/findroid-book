@@ -35,6 +35,7 @@ import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -68,6 +69,8 @@ class JellyfinRepositoryImpl(
     private val database: ServerDatabaseDao,
     private val appPreferences: AppPreferences,
 ) : JellyfinRepository {
+    private val canDeleteMediaCache = ConcurrentHashMap<UUID, Boolean>()
+
     override suspend fun getPublicSystemInfo(): PublicSystemInfo =
         withContext(Dispatchers.IO) { jellyfinApi.systemApi.getPublicSystemInfo().content }
 
@@ -557,6 +560,27 @@ class JellyfinRepositoryImpl(
             }
         }
     }
+
+    override suspend fun deleteServerItem(itemId: UUID) {
+        withContext(Dispatchers.IO) { jellyfinApi.libraryApi.deleteItem(itemId) }
+    }
+
+    override suspend fun canDeleteMedia(): Boolean =
+        withContext(Dispatchers.IO) {
+            val userId = getUserId()
+            canDeleteMediaCache[userId]?.let {
+                return@withContext it
+            }
+            try {
+                val policy = jellyfinApi.userApi.getCurrentUser().content.policy
+                val allowed =
+                    policy?.isAdministrator == true || policy?.enableContentDeletion == true
+                canDeleteMediaCache[userId] = allowed
+                allowed
+            } catch (_: Exception) {
+                false
+            }
+        }
 
     override fun getBaseUrl() = jellyfinApi.api.baseUrl.orEmpty()
 

@@ -1,6 +1,7 @@
 package dev.jdtech.jellyfin.presentation.film
 
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,10 +20,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -35,11 +38,14 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.jdtech.jellyfin.PlayerActivity
+import dev.jdtech.jellyfin.core.R as CoreR
 import dev.jdtech.jellyfin.core.presentation.dummy.dummySeason
 import dev.jdtech.jellyfin.film.presentation.season.SeasonAction
 import dev.jdtech.jellyfin.film.presentation.season.SeasonState
 import dev.jdtech.jellyfin.film.presentation.season.SeasonViewModel
 import dev.jdtech.jellyfin.models.FindroidItem
+import dev.jdtech.jellyfin.presentation.components.DeleteServerErrorEffect
+import dev.jdtech.jellyfin.presentation.components.MessageSnackbarHost
 import dev.jdtech.jellyfin.presentation.film.components.Direction
 import dev.jdtech.jellyfin.presentation.film.components.EpisodeCard
 import dev.jdtech.jellyfin.presentation.film.components.ItemButtonsBar
@@ -66,6 +72,13 @@ fun SeasonScreen(
 
     LaunchedEffect(true) { viewModel.loadSeason(seasonId = seasonId) }
 
+    LaunchedEffect(state.deletedFromServer) {
+        if (state.deletedFromServer) {
+            Toast.makeText(context, CoreR.string.deleted_from_server, Toast.LENGTH_SHORT).show()
+            navigateBack()
+        }
+    }
+
     SeasonScreenLayout(
         state = state,
         onAction = { action ->
@@ -90,6 +103,8 @@ fun SeasonScreen(
 @Composable
 private fun SeasonScreenLayout(state: SeasonState, onAction: (SeasonAction) -> Unit) {
     val safePadding = rememberSafePadding()
+
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val paddingStart = safePadding.start + MaterialTheme.spacings.default
     val paddingEnd = safePadding.end + MaterialTheme.spacings.default
@@ -165,6 +180,9 @@ private fun SeasonScreenLayout(state: SeasonState, onAction: (SeasonAction) -> U
                         modifier =
                             Modifier.padding(start = paddingStart, end = paddingEnd).fillMaxWidth(),
                         canPlay = state.episodes.isNotEmpty(),
+                        canDeleteFromServer = state.canDeleteFromServer,
+                        isDeletingFromServer = state.isDeletingFromServer,
+                        onDeleteFromServerClick = { onAction(SeasonAction.DeleteFromServer) },
                     )
                 }
                 items(items = state.episodes, key = { episode -> episode.id }) { episode ->
@@ -198,6 +216,15 @@ private fun SeasonScreenLayout(state: SeasonState, onAction: (SeasonAction) -> U
                 }
             }
         }
+
+        DeleteServerErrorEffect(error = state.deleteServerError, hostState = snackbarHostState)
+
+        MessageSnackbarHost(
+            hostState = snackbarHostState,
+            modifier =
+                Modifier.align(Alignment.BottomCenter)
+                    .padding(bottom = safePadding.bottom + MaterialTheme.spacings.medium),
+        )
     }
 }
 

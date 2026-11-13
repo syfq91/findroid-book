@@ -21,6 +21,8 @@ import androidx.compose.ui.unit.dp
 import dev.jdtech.jellyfin.core.R as CoreR
 import dev.jdtech.jellyfin.core.presentation.downloader.DownloaderState
 import dev.jdtech.jellyfin.models.FindroidBook
+import dev.jdtech.jellyfin.models.isDownloaded
+import dev.jdtech.jellyfin.presentation.components.DeleteServerButton
 import dev.jdtech.jellyfin.presentation.components.DownloadButton
 import dev.jdtech.jellyfin.presentation.components.DownloadDialogs
 import dev.jdtech.jellyfin.presentation.components.FavoriteButton
@@ -39,8 +41,13 @@ fun BookButtonsBar(
     onDownloadDeleteClick: () -> Unit,
     modifier: Modifier = Modifier,
     downloaderState: DownloaderState? = null,
+    canDeleteFromServer: Boolean = false,
+    isDeletingFromServer: Boolean = false,
+    onDeleteFromServerClick: () -> Unit = {},
 ) {
     val downloadControls = rememberDownloadControlsState()
+
+    val deleteServerMessage = stringResource(CoreR.string.delete_from_server_message)
 
     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
         Column(
@@ -80,6 +87,14 @@ fun BookButtonsBar(
                     downloaderState = downloaderState,
                     onDownloadClick = onDownloadClick,
                     onDownloadCancelClick = onDownloadCancelClick,
+                )
+                DeleteServerButton(
+                    canDeleteFromServer = canDeleteFromServer,
+                    isDeletingFromServer = isDeletingFromServer,
+                    isDownloaded = book.isDownloaded(),
+                    message = deleteServerMessage,
+                    downloadInProgress = downloaderState?.isDownloading == true,
+                    onDeleteFromServerClick = onDeleteFromServerClick,
                 )
             }
         }
