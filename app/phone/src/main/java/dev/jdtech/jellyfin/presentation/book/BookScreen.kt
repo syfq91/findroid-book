@@ -34,6 +34,7 @@ import dev.jdtech.jellyfin.core.presentation.downloader.DownloaderEvent
 import dev.jdtech.jellyfin.core.presentation.downloader.DownloaderState
 import dev.jdtech.jellyfin.core.presentation.downloader.DownloaderViewModel
 import dev.jdtech.jellyfin.presentation.book.components.BookButtonsBar
+import dev.jdtech.jellyfin.presentation.components.DownloadErrorSnackbar
 import dev.jdtech.jellyfin.presentation.film.components.ItemHeader
 import dev.jdtech.jellyfin.presentation.film.components.ItemTopBar
 import dev.jdtech.jellyfin.presentation.film.components.OverviewText
@@ -265,5 +266,12 @@ private fun BookScreenLayout(
                 color = MaterialTheme.colorScheme.error,
             )
         }
+
+        DownloadErrorSnackbar(
+            downloaderState = downloaderState,
+            modifier =
+                Modifier.align(Alignment.BottomCenter)
+                    .padding(bottom = safePadding.bottom + MaterialTheme.spacings.medium),
+        )
     }
 }

@@ -45,6 +45,7 @@ import dev.jdtech.jellyfin.core.presentation.dummy.dummyVideoMetadata
 import dev.jdtech.jellyfin.film.presentation.movie.MovieAction
 import dev.jdtech.jellyfin.film.presentation.movie.MovieState
 import dev.jdtech.jellyfin.film.presentation.movie.MovieViewModel
+import dev.jdtech.jellyfin.presentation.components.DownloadErrorSnackbar
 import dev.jdtech.jellyfin.presentation.film.components.ActorsRow
 import dev.jdtech.jellyfin.presentation.film.components.ExtraInfoText
 import dev.jdtech.jellyfin.presentation.film.components.InfoText
@@ -278,6 +279,13 @@ private fun MovieScreenLayout(
             hasHomeButton = true,
             onBackClick = { onAction(MovieAction.OnBackClick) },
             onHomeClick = { onAction(MovieAction.OnHomeClick) },
+        )
+
+        DownloadErrorSnackbar(
+            downloaderState = downloaderState,
+            modifier =
+                Modifier.align(Alignment.BottomCenter)
+                    .padding(bottom = safePadding.bottom + MaterialTheme.spacings.medium),
         )
     }
 }

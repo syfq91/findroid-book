@@ -23,7 +23,6 @@ import dev.jdtech.jellyfin.core.presentation.downloader.DownloaderState
 import dev.jdtech.jellyfin.models.FindroidBook
 import dev.jdtech.jellyfin.presentation.components.DownloadButton
 import dev.jdtech.jellyfin.presentation.components.DownloadDialogs
-import dev.jdtech.jellyfin.presentation.components.DownloadProgress
 import dev.jdtech.jellyfin.presentation.components.FavoriteButton
 import dev.jdtech.jellyfin.presentation.components.MarkPlayedButton
 import dev.jdtech.jellyfin.presentation.components.rememberDownloadControlsState
@@ -80,20 +79,14 @@ fun BookButtonsBar(
                     state = downloadControls,
                     downloaderState = downloaderState,
                     onDownloadClick = onDownloadClick,
+                    onDownloadCancelClick = onDownloadCancelClick,
                 )
             }
-
-            DownloadProgress(
-                state = downloadControls,
-                downloaderState = downloaderState,
-                onDownloadClick = onDownloadClick,
-            )
         }
 
         DownloadDialogs(
             state = downloadControls,
             onDownloadClick = onDownloadClick,
-            onDownloadCancelClick = onDownloadCancelClick,
             onDownloadDeleteClick = onDownloadDeleteClick,
         )
     }

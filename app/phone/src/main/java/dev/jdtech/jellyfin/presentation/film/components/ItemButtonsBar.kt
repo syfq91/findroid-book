@@ -24,7 +24,6 @@ import dev.jdtech.jellyfin.models.FindroidMovie
 import dev.jdtech.jellyfin.models.FindroidShow
 import dev.jdtech.jellyfin.presentation.components.DownloadButton
 import dev.jdtech.jellyfin.presentation.components.DownloadDialogs
-import dev.jdtech.jellyfin.presentation.components.DownloadProgress
 import dev.jdtech.jellyfin.presentation.components.FavoriteButton
 import dev.jdtech.jellyfin.presentation.components.MarkPlayedButton
 import dev.jdtech.jellyfin.presentation.components.rememberDownloadControlsState
@@ -122,18 +121,13 @@ fun ItemButtonsBar(
                     state = downloadControls,
                     downloaderState = downloaderState,
                     onDownloadClick = onDownloadClick,
+                    onDownloadCancelClick = onDownloadCancelClick,
                 )
             }
-            DownloadProgress(
-                state = downloadControls,
-                downloaderState = downloaderState,
-                onDownloadClick = onDownloadClick,
-            )
         }
         DownloadDialogs(
             state = downloadControls,
             onDownloadClick = onDownloadClick,
-            onDownloadCancelClick = onDownloadCancelClick,
             onDownloadDeleteClick = onDownloadDeleteClick,
         )
     }
