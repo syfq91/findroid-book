@@ -567,6 +567,9 @@ class BookReaderActivity : AppCompatActivity() {
         }
     }
 
+    private fun locatorKey(bookId: UUID): String =
+        "$KEY_LOCATOR_PREFIX${jellyfinRepository.getUserId()}_$bookId"
+
     /**
      * Returns the locator to open the book at. The local locator is authoritative when present,
      * since it is more precise. Otherwise fall back to the reading position the server has for this
@@ -574,7 +577,7 @@ class BookReaderActivity : AppCompatActivity() {
      */
     private suspend fun restoreLocator(pub: Publication, serverPositionTicks: Long): Locator? {
         val savedLocatorJson =
-            appPreferences.sharedPreferences.getString(KEY_LOCATOR_PREFIX + bookId, null)
+            appPreferences.sharedPreferences.getString(locatorKey(bookId), null)
         val localLocator = savedLocatorJson?.let {
             try {
                 Locator.fromJSON(JSONObject(it))
@@ -864,7 +867,7 @@ class BookReaderActivity : AppCompatActivity() {
         // Persist local reading position
         appPreferences.sharedPreferences
             .edit()
-            .putString(KEY_LOCATOR_PREFIX + bookId, locator.toJSON().toString())
+            .putString(locatorKey(bookId), locator.toJSON().toString())
             .apply()
     }
 
