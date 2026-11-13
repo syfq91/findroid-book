@@ -16,6 +16,8 @@ android {
         named("release") { isMinifyEnabled = false }
         register("staging") { initWith(getByName("release")) }
     }
+
+    testOptions { unitTests.isIncludeAndroidResources = true }
 }
 
 dependencies {
@@ -36,4 +38,10 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.jellyfin.core)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.readium.shared)
+    implementation(libs.readium.streamer)
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation(libs.readium.navigator)
 }

@@ -1,4 +1,4 @@
-package dev.jdtech.jellyfin
+package dev.jdtech.jellyfin.book.reader
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -28,7 +28,7 @@ class EpubProgressTest {
         val locator = createLocator("chapter1.xhtml", progression = 0.25)
         val chapterUrl = Url("chapter1.xhtml")!!
         val (page, total) =
-            BookReaderActivity.calculateEpubChapterProgress(
+            BookProgress.calculateEpubChapterProgress(
                 locator = locator,
                 readingOrderIndex = 0,
                 positionsByReadingOrder = listOf(listOf(locator, locator)),
@@ -47,7 +47,7 @@ class EpubProgressTest {
             createLocator("chapter1.xhtml#section2?key=val", progression = 0.25)
         val chapterUrl = Url("chapter1.xhtml")!!
         val (page, total) =
-            BookReaderActivity.calculateEpubChapterProgress(
+            BookProgress.calculateEpubChapterProgress(
                 locator = locatorWithFragment,
                 readingOrderIndex = 0,
                 positionsByReadingOrder = emptyList(),
@@ -72,7 +72,7 @@ class EpubProgressTest {
                 createLocator("c1.xhtml"),
             )
         val (page, total) =
-            BookReaderActivity.calculateEpubChapterProgress(
+            BookProgress.calculateEpubChapterProgress(
                 locator = locator,
                 readingOrderIndex = 1,
                 positionsByReadingOrder = listOf(dummyChapter0, dummyChapter1),
@@ -90,7 +90,7 @@ class EpubProgressTest {
         val positions = List(5) { createLocator("c.xhtml") }
         val startLocator = createLocator("c.xhtml", progression = 0.0)
         val (startPage, totalPages) =
-            BookReaderActivity.calculateEpubChapterProgress(
+            BookProgress.calculateEpubChapterProgress(
                 locator = startLocator,
                 readingOrderIndex = 0,
                 positionsByReadingOrder = listOf(positions),
@@ -100,7 +100,7 @@ class EpubProgressTest {
 
         val endLocator = createLocator("c.xhtml", progression = 1.0)
         val (endPage, _) =
-            BookReaderActivity.calculateEpubChapterProgress(
+            BookProgress.calculateEpubChapterProgress(
                 locator = endLocator,
                 readingOrderIndex = 0,
                 positionsByReadingOrder = listOf(positions),
@@ -114,7 +114,7 @@ class EpubProgressTest {
         val chapterUrl = Url("chapter1.xhtml")!!
         val positions = List(10) { createLocator("chapter1.xhtml") }
         val (page, total) =
-            BookReaderActivity.calculateEpubChapterProgress(
+            BookProgress.calculateEpubChapterProgress(
                 locator = locator,
                 readingOrderIndex = 0,
                 positionsByReadingOrder = listOf(positions),
@@ -131,7 +131,7 @@ class EpubProgressTest {
     fun testEmptyOrInvalidReadingOrderFallback() {
         val locator = createLocator("unknown.xhtml", progression = 0.5)
         val (page, total) =
-            BookReaderActivity.calculateEpubChapterProgress(
+            BookProgress.calculateEpubChapterProgress(
                 locator = locator,
                 readingOrderIndex = null,
                 positionsByReadingOrder = emptyList(),
@@ -149,7 +149,7 @@ class EpubProgressTest {
                 title = "Chapter 1: The Beginning",
             )
         val resolved =
-            BookReaderActivity.resolveChapterTitle(
+            BookProgress.resolveChapterTitle(
                 locator = locator,
                 bookTitle = "Sample Book",
             )
@@ -169,7 +169,7 @@ class EpubProgressTest {
                 Link(href = Url("ch2.xhtml")!!, title = "Chapter 2"),
             )
         val resolved =
-            BookReaderActivity.resolveChapterTitle(
+            BookProgress.resolveChapterTitle(
                 locator = locator,
                 tableOfContents = toc,
                 bookTitle = "Sample Book",
@@ -194,7 +194,7 @@ class EpubProgressTest {
                 )
             )
         val resolved =
-            BookReaderActivity.resolveChapterTitle(
+            BookProgress.resolveChapterTitle(
                 locator = locator,
                 tableOfContents = toc,
                 bookTitle = "Sample Book",
@@ -215,7 +215,7 @@ class EpubProgressTest {
                 Link(href = Url("ch1.xhtml")!!, title = "Chapter 1"),
             )
         val resolved =
-            BookReaderActivity.resolveChapterTitle(
+            BookProgress.resolveChapterTitle(
                 locator = locator,
                 readingOrder = readingOrder,
                 bookTitle = "Sample Book",
@@ -232,7 +232,7 @@ class EpubProgressTest {
                 mediaType = MediaType.JPEG,
             )
         val resolved =
-            BookReaderActivity.resolveChapterTitle(
+            BookProgress.resolveChapterTitle(
                 locator = locator,
                 tableOfContents = emptyList(),
                 readingOrder = listOf(Link(href = Url("001.jpg")!!)),
@@ -244,7 +244,7 @@ class EpubProgressTest {
     @Test
     fun testResolveChapterTitleFallsBackToBookTitleWhenLocatorNull() {
         val resolved =
-            BookReaderActivity.resolveChapterTitle(
+            BookProgress.resolveChapterTitle(
                 locator = null,
                 bookTitle = "My Book",
             )
@@ -254,12 +254,12 @@ class EpubProgressTest {
     @Test
     fun testCalculateTotalTicksForEpub() {
         val defaultTicks =
-            BookReaderActivity.calculateTotalTicks(pub = null, serverRuntimeTicks = 0L)
-        assertEquals(BookReaderActivity.JELLYFIN_EPUB_TICKS_TOTAL, defaultTicks)
+            BookProgress.calculateTotalTicks(pub = null, serverRuntimeTicks = 0L)
+        assertEquals(BookProgress.JELLYFIN_EPUB_TICKS_TOTAL, defaultTicks)
         assertEquals(10_000_000L, defaultTicks)
 
         val serverTicks =
-            BookReaderActivity.calculateTotalTicks(pub = null, serverRuntimeTicks = 10_000_000L)
+            BookProgress.calculateTotalTicks(pub = null, serverRuntimeTicks = 10_000_000L)
         assertEquals(10_000_000L, serverTicks)
     }
 
@@ -272,7 +272,7 @@ class EpubProgressTest {
                 locations = Locator.Locations(totalProgression = 0.0),
             )
         val (startTicks, startProg) =
-            BookReaderActivity.calculateProgressTicks(startLocator, pub = null)
+            BookProgress.calculateProgressTicks(startLocator, pub = null)
         assertEquals(0L, startTicks)
         assertEquals(0.0, startProg, 0.0001)
 
@@ -283,7 +283,7 @@ class EpubProgressTest {
                 locations = Locator.Locations(totalProgression = 0.25),
             )
         val (quarterTicks, quarterProg) =
-            BookReaderActivity.calculateProgressTicks(quarterLocator, pub = null)
+            BookProgress.calculateProgressTicks(quarterLocator, pub = null)
         assertEquals(2_500_000L, quarterTicks)
         assertEquals(0.25, quarterProg, 0.0001)
 
@@ -294,7 +294,7 @@ class EpubProgressTest {
                 locations = Locator.Locations(totalProgression = 1.0),
             )
         val (endTicks, endProg) =
-            BookReaderActivity.calculateProgressTicks(endLocator, pub = null)
+            BookProgress.calculateProgressTicks(endLocator, pub = null)
         assertEquals(10_000_000L, endTicks)
         assertEquals(1.0, endProg, 0.0001)
 
@@ -305,55 +305,55 @@ class EpubProgressTest {
                 locations = Locator.Locations(),
             )
         val (nullTicks, nullProg) =
-            BookReaderActivity.calculateProgressTicks(nullProgLocator, pub = null)
+            BookProgress.calculateProgressTicks(nullProgLocator, pub = null)
         assertEquals(0L, nullTicks)
         assertEquals(0.0, nullProg, 0.0001)
     }
 
     @Test
     fun testCalculateProgressionFromServerTicks() {
-        val totalTicks = BookReaderActivity.JELLYFIN_EPUB_TICKS_TOTAL
+        val totalTicks = BookProgress.JELLYFIN_EPUB_TICKS_TOTAL
 
         // Zero / negative server ticks
         assertEquals(
             0.0,
-            BookReaderActivity.calculateProgressionFromServerTicks(0L, totalTicks),
+            BookProgress.calculateProgressionFromServerTicks(0L, totalTicks),
             0.0001,
         )
         assertEquals(
             0.0,
-            BookReaderActivity.calculateProgressionFromServerTicks(-100L, totalTicks),
+            BookProgress.calculateProgressionFromServerTicks(-100L, totalTicks),
             0.0001,
         )
 
         // Standard Jellyfin server ticks (e.g. 25% = 2,500,000 ticks)
         assertEquals(
             0.25,
-            BookReaderActivity.calculateProgressionFromServerTicks(2_500_000L, totalTicks),
+            BookProgress.calculateProgressionFromServerTicks(2_500_000L, totalTicks),
             0.0001,
         )
         assertEquals(
             1.0,
-            BookReaderActivity.calculateProgressionFromServerTicks(10_000_000L, totalTicks),
+            BookProgress.calculateProgressionFromServerTicks(10_000_000L, totalTicks),
             0.0001,
         )
 
         // Legacy virtual ticks from previous Findroid versions (1B scale)
         assertEquals(
             0.25,
-            BookReaderActivity.calculateProgressionFromServerTicks(250_000_000L, totalTicks),
+            BookProgress.calculateProgressionFromServerTicks(250_000_000L, totalTicks),
             0.0001,
         )
         assertEquals(
             0.50,
-            BookReaderActivity.calculateProgressionFromServerTicks(500_000_000L, totalTicks),
+            BookProgress.calculateProgressionFromServerTicks(500_000_000L, totalTicks),
             0.0001,
         )
 
         // Server reports 0 total ticks
         assertEquals(
             0.0,
-            BookReaderActivity.calculateProgressionFromServerTicks(100L, 0L),
+            BookProgress.calculateProgressionFromServerTicks(100L, 0L),
             0.0001,
         )
     }

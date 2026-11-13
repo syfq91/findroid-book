@@ -1,4 +1,4 @@
-package dev.jdtech.jellyfin
+package dev.jdtech.jellyfin.book.reader
 
 import java.io.File
 import java.io.FileOutputStream
@@ -254,7 +254,7 @@ class CbzTest {
             zos.closeEntry()
         }
 
-        val detected = BookReaderActivity.detectBookFormat(file)
+        val detected = BookFilePreparer.detectBookFormat(file)
         assertEquals("CBZ with comicbook mimetype must be detected as cbz", "cbz", detected)
     }
 
@@ -267,7 +267,7 @@ class CbzTest {
             zos.closeEntry()
         }
 
-        val detected = BookReaderActivity.detectBookFormat(file)
+        val detected = BookFilePreparer.detectBookFormat(file)
         assertEquals("CBZ with ComicInfo.xml must be detected as cbz", "cbz", detected)
     }
 
@@ -328,7 +328,7 @@ class CbzTest {
             zos.closeEntry()
         }
 
-        val detected = BookReaderActivity.detectBookFormat(file)
+        val detected = BookFilePreparer.detectBookFormat(file)
         assertEquals(
             "CBZ with Shift-JIS entries must be detected as cbz without failing",
             "cbz",
@@ -391,7 +391,7 @@ class CbzTest {
                 )
                 zos.closeEntry()
             }
-            val detected = BookReaderActivity.detectBookFormat(file)
+            val detected = BookFilePreparer.detectBookFormat(file)
             assertEquals("CBZ with $ext must be detected as cbz", "cbz", detected)
         }
     }
@@ -399,7 +399,7 @@ class CbzTest {
     @Test
     fun testDetectBookFormatRealEpub() {
         val epubFile = createSampleEpub("sample.epub")
-        val detected = BookReaderActivity.detectBookFormat(epubFile)
+        val detected = BookFilePreparer.detectBookFormat(epubFile)
         assertEquals("Standard EPUB must be detected as epub", "epub", detected)
     }
 
@@ -407,26 +407,26 @@ class CbzTest {
     fun testDetectBookFormatFallbacks() {
         val pdfFile = tempFolder.newFile("doc.pdf")
         pdfFile.writeBytes("%PDF-1.4 sample content".toByteArray())
-        assertEquals("pdf", BookReaderActivity.detectBookFormat(pdfFile))
+        assertEquals("pdf", BookFilePreparer.detectBookFormat(pdfFile))
 
         val rarFile = tempFolder.newFile("archive.cbr")
         rarFile.writeBytes(byteArrayOf(0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x00))
-        assertEquals("cbr", BookReaderActivity.detectBookFormat(rarFile))
+        assertEquals("cbr", BookFilePreparer.detectBookFormat(rarFile))
 
         // Empty zip with container hint
         val emptyZip = tempFolder.newFile("empty.zip")
         ZipOutputStream(FileOutputStream(emptyZip)).use { /* empty */ }
-        assertEquals("cbz", BookReaderActivity.detectBookFormat(emptyZip, containerHint = "cbz"))
-        assertEquals("cbz", BookReaderActivity.detectBookFormat(emptyZip, containerHint = "zip"))
+        assertEquals("cbz", BookFilePreparer.detectBookFormat(emptyZip, containerHint = "cbz"))
+        assertEquals("cbz", BookFilePreparer.detectBookFormat(emptyZip, containerHint = "zip"))
     }
 
     @Test
     fun testBuildFormatHints() {
-        val cbzHints = BookReaderActivity.buildFormatHints("cbz")
+        val cbzHints = BookFilePreparer.buildFormatHints("cbz")
         assertTrue(cbzHints.hasFileExtension("cbz"))
         assertTrue(cbzHints.hasMediaType("application/vnd.comicbook+zip"))
 
-        val epubHints = BookReaderActivity.buildFormatHints("epub")
+        val epubHints = BookFilePreparer.buildFormatHints("epub")
         assertTrue(epubHints.hasFileExtension("epub"))
         assertTrue(epubHints.hasMediaType("application/epub+zip"))
     }
@@ -437,7 +437,7 @@ class CbzTest {
         source.writeText("hello world")
         val target = File(tempFolder.root, "target.cbz")
 
-        val result = BookReaderActivity.safeMoveOrCopy(source, target)
+        val result = BookFilePreparer.safeMoveOrCopy(source, target)
         assertEquals(target.absolutePath, result.absolutePath)
         assertTrue(target.exists())
         assertEquals("hello world", target.readText())
@@ -453,7 +453,7 @@ class CbzTest {
                 archiveOpener = DefaultArchiveOpener(),
                 formatSniffer = DefaultFormatSniffer(),
             )
-        val hints = BookReaderActivity.buildFormatHints("cbz")
+        val hints = BookFilePreparer.buildFormatHints("cbz")
         val asset =
             assetRetriever.retrieve(file, hints).getOrElse {
                 fail("Failed to retrieve asset: $it")
@@ -483,7 +483,7 @@ class CbzTest {
                 archiveOpener = DefaultArchiveOpener(),
                 formatSniffer = DefaultFormatSniffer(),
             )
-        val hints = BookReaderActivity.buildFormatHints("cbz")
+        val hints = BookFilePreparer.buildFormatHints("cbz")
         val asset =
             assetRetriever.retrieve(file, hints).getOrElse {
                 fail("Failed to retrieve asset: $it")
@@ -514,7 +514,7 @@ class CbzTest {
                     archiveOpener = DefaultArchiveOpener(),
                     formatSniffer = DefaultFormatSniffer(),
                 )
-            val hints = BookReaderActivity.buildFormatHints("cbz")
+            val hints = BookFilePreparer.buildFormatHints("cbz")
             val asset =
                 assetRetriever.retrieve(file, hints).getOrElse {
                     fail("Failed to retrieve asset for $fileName: $it")
@@ -551,7 +551,7 @@ class CbzTest {
                 archiveOpener = DefaultArchiveOpener(),
                 formatSniffer = DefaultFormatSniffer(),
             )
-        val hints = BookReaderActivity.buildFormatHints("cbz")
+        val hints = BookFilePreparer.buildFormatHints("cbz")
         val asset =
             assetRetriever.retrieve(file, hints).getOrElse {
                 fail("Failed to retrieve asset: $it")
@@ -621,11 +621,11 @@ class CbzTest {
     fun testSelfHealMisnamedCachedCbzFile() = runBlocking {
         // Simulate a CBZ that was previously renamed to .epub due to the bug
         val corruptedEpubFile = createSampleCbz("book-1234.epub", includeComicInfo = true)
-        val detected = BookReaderActivity.detectBookFormat(corruptedEpubFile)
+        val detected = BookFilePreparer.detectBookFormat(corruptedEpubFile)
         assertEquals("Should correctly detect as cbz despite .epub extension", "cbz", detected)
 
         val targetFile = File(tempFolder.root, "book-1234.cbz")
-        val healedFile = BookReaderActivity.safeMoveOrCopy(corruptedEpubFile, targetFile)
+        val healedFile = BookFilePreparer.safeMoveOrCopy(corruptedEpubFile, targetFile)
         assertEquals(targetFile.absolutePath, healedFile.absolutePath)
         assertTrue("Healed CBZ file should exist", healedFile.exists())
 
@@ -633,7 +633,7 @@ class CbzTest {
         val context = RuntimeEnvironment.getApplication()
         val httpClient = org.readium.r2.shared.util.http.DefaultHttpClient()
         val assetRetriever = AssetRetriever(context.contentResolver, httpClient)
-        val hints = BookReaderActivity.buildFormatHints(healedFile.extension)
+        val hints = BookFilePreparer.buildFormatHints(healedFile.extension)
         val asset =
             assetRetriever.retrieve(healedFile, hints).getOrElse {
                 fail("Failed to retrieve asset: $it")
@@ -662,7 +662,7 @@ class CbzTest {
         val context = RuntimeEnvironment.getApplication()
         val httpClient = org.readium.r2.shared.util.http.DefaultHttpClient()
         val assetRetriever = AssetRetriever(context.contentResolver, httpClient)
-        val hints = BookReaderActivity.buildFormatHints("epub")
+        val hints = BookFilePreparer.buildFormatHints("epub")
         val asset =
             assetRetriever.retrieve(epubFile, hints).getOrElse {
                 fail("Failed to retrieve asset: $it")
@@ -700,7 +700,7 @@ class CbzTest {
         val context = RuntimeEnvironment.getApplication()
         val httpClient = org.readium.r2.shared.util.http.DefaultHttpClient()
         val assetRetriever = AssetRetriever(context.contentResolver, httpClient)
-        val hints = BookReaderActivity.buildFormatHints("cbz")
+        val hints = BookFilePreparer.buildFormatHints("cbz")
         val asset =
             assetRetriever.retrieve(file, hints).getOrElse {
                 fail("Failed to retrieve asset: $it")
@@ -716,37 +716,37 @@ class CbzTest {
         assertEquals(3, pub.readingOrder.size)
 
         // Total ticks fallback to 3 * 10,000 = 30,000L
-        val totalTicks = BookReaderActivity.calculateTotalTicks(pub, serverRuntimeTicks = 0L)
+        val totalTicks = BookProgress.calculateTotalTicks(pub, serverRuntimeTicks = 0L)
         assertEquals(30_000L, totalTicks)
 
         val positions = pub.positions()
         assertEquals(3, positions.size)
 
         // Page 1 (index 0)
-        val (p1Ticks, p1Prog) = BookReaderActivity.calculateProgressTicks(positions[0], pub)
+        val (p1Ticks, p1Prog) = BookProgress.calculateProgressTicks(positions[0], pub)
         assertEquals(0L, p1Ticks)
         assertEquals(0.0, p1Prog, 0.0001)
 
         // Page 2 (index 1)
-        val (p2Ticks, p2Prog) = BookReaderActivity.calculateProgressTicks(positions[1], pub)
+        val (p2Ticks, p2Prog) = BookProgress.calculateProgressTicks(positions[1], pub)
         assertEquals(10_000L, p2Ticks)
         assertEquals(1.0 / 3.0, p2Prog, 0.0001)
 
         // Page 3 (index 2)
-        val (p3Ticks, p3Prog) = BookReaderActivity.calculateProgressTicks(positions[2], pub)
+        val (p3Ticks, p3Prog) = BookProgress.calculateProgressTicks(positions[2], pub)
         assertEquals(20_000L, p3Ticks)
         assertEquals(2.0 / 3.0, p3Prog, 0.0001)
 
         // Server tick restoration (normal Jellyfin tick for page 2)
         val restoredProg =
-            BookReaderActivity.calculateProgressionFromServerTicks(10_000L, totalTicks)
+            BookProgress.calculateProgressionFromServerTicks(10_000L, totalTicks)
         assertEquals(1.0 / 3.0, restoredProg, 0.0001)
 
         // Server tick restoration (legacy Findroid 1B virtual tick scale for page 2)
         val legacyServerTicks =
-            ((1.0 / 3.0) * BookReaderActivity.LEGACY_VIRTUAL_TICKS_TOTAL).toLong()
+            ((1.0 / 3.0) * BookProgress.LEGACY_VIRTUAL_TICKS_TOTAL).toLong()
         val restoredLegacyProg =
-            BookReaderActivity.calculateProgressionFromServerTicks(legacyServerTicks, totalTicks)
+            BookProgress.calculateProgressionFromServerTicks(legacyServerTicks, totalTicks)
         assertEquals(1.0 / 3.0, restoredLegacyProg, 0.001)
     }
 }

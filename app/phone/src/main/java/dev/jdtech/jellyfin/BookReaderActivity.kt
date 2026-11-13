@@ -34,16 +34,14 @@ import dev.jdtech.jellyfin.models.FindroidSourceType
 import dev.jdtech.jellyfin.presentation.book.components.ReaderAppearanceSheet
 import dev.jdtech.jellyfin.presentation.book.components.ReaderPreferencesState
 import dev.jdtech.jellyfin.presentation.theme.FindroidTheme
+import dev.jdtech.jellyfin.book.reader.BookFilePreparer
+import dev.jdtech.jellyfin.book.reader.BookProgress
+import dev.jdtech.jellyfin.book.reader.PreparedBook
 import dev.jdtech.jellyfin.repository.DownloadResult
 import dev.jdtech.jellyfin.repository.JellyfinRepository
 import dev.jdtech.jellyfin.settings.domain.AppPreferences
-import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
 import java.io.IOException
-import java.nio.charset.StandardCharsets
 import java.util.UUID
-import java.util.zip.ZipFile
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
@@ -398,252 +396,13 @@ class BookReaderActivity : AppCompatActivity() {
     }
 
     private suspend fun prepareBookFile(): PreparedBook =
-        withContext(Dispatchers.IO) {
-            var container = intent.getStringExtra(EXTRA_BOOK_CONTAINER)
-            var serverPositionTicks = 0L
-            var serverRuntimeTicks = 0L
-            try {
-                val book = jellyfinRepository.getBook(bookUUID)
-                serverPositionTicks = book.playbackPositionTicks
-                serverRuntimeTicks = book.runtimeTicks
-                if (container.isNullOrBlank()) {
-                    container = book.container
-                }
-                val localSource = book.sources.firstOrNull { it.type == FindroidSourceType.LOCAL }
-                if (localSource != null) {
-                    val localFile = File(localSource.path)
-                    if (localFile.exists() && localFile.length() > 0) {
-                        Timber.d("Using downloaded local book file: ${localFile.absolutePath}")
-                        val detected = detectBookFormat(localFile, container)
-                        val ext =
-                            container?.lowercase()?.removePrefix(".")?.takeIf {
-                                it in listOf("cbz", "cbr", "epub", "pdf")
-                            } ?: detected
-                        val hints = buildFormatHints(ext)
-                        return@withContext PreparedBook(
-                            file = localFile,
-                            serverPositionTicks = serverPositionTicks,
-                            serverRuntimeTicks = serverRuntimeTicks,
-                            formatHints = hints,
-                        )
-                    }
-                }
-            } catch (e: Exception) {
-                Timber.w(e, "Could not fetch book details or local source")
-            }
-
-            // Keep reader copies in filesDir so the OS does not evict them as cache, and prune
-            // entries that have not been opened for a while.
-            val booksDir = File(filesDir, "books").apply { mkdirs() }
-            pruneBookCache(booksDir)
-            val existing = findCachedBook(booksDir)
-            if (existing != null) {
-                val resolvedFile = normalizeCachedBookExtension(existing, booksDir, container)
-                val revalidation = revalidateCachedBook(resolvedFile, booksDir)
-                val preparedFile =
-                    if (revalidation.notModified) {
-                        touchCachedBook(resolvedFile, booksDir)
-                        resolvedFile
-                    } else {
-                        storeBookDownload(
-                            result = revalidation,
-                            booksDir = booksDir,
-                            existing = resolvedFile,
-                            container = container,
-                        )
-                    }
-                val finalExt = preparedFile.extension.lowercase().ifBlank {
-                    detectBookFormat(preparedFile, container)
-                }
-                val hints = buildFormatHints(finalExt)
-                return@withContext PreparedBook(
-                    file = preparedFile,
-                    serverPositionTicks = serverPositionTicks,
-                    serverRuntimeTicks = serverRuntimeTicks,
-                    formatHints = hints,
-                )
-            }
-
-            val result = jellyfinRepository.openDownloadStream(bookUUID)
-            val resolvedFile =
-                storeBookDownload(
-                    result = result,
-                    booksDir = booksDir,
-                    existing = null,
-                    container = container,
-                )
-            val finalExt =
-                resolvedFile.extension.lowercase().ifBlank {
-                    detectBookFormat(resolvedFile, container)
-                }
-            val hints = buildFormatHints(finalExt)
-            PreparedBook(
-                file = resolvedFile,
-                serverPositionTicks = serverPositionTicks,
-                serverRuntimeTicks = serverRuntimeTicks,
-                formatHints = hints,
+        BookFilePreparer(
+                context = this,
+                jellyfinRepository = jellyfinRepository,
+                bookId = bookUUID,
+                containerHint = intent.getStringExtra(EXTRA_BOOK_CONTAINER),
             )
-        }
-
-    private fun findCachedBook(booksDir: File): File? =
-        booksDir
-            .listFiles { _, name ->
-                name.startsWith("$bookId.") &&
-                    !name.endsWith(".tmp") &&
-                    !name.endsWith(".meta")
-            }
-            ?.firstOrNull { it.length() > 0 }
-
-    private fun normalizeCachedBookExtension(
-        file: File,
-        booksDir: File,
-        container: String?,
-    ): File {
-        val detected = detectBookFormat(file, container)
-        val targetExt =
-            container?.lowercase()?.removePrefix(".")?.takeIf { it in BOOK_EXTENSIONS } ?: detected
-        return if (file.extension.lowercase() != targetExt && targetExt in BOOK_EXTENSIONS) {
-            safeMoveOrCopy(file, File(booksDir, "$bookId.$targetExt"))
-        } else {
-            file
-        }
-    }
-
-    /**
-     * Revalidates a cached copy with conditional headers. When the server does not provide
-     * validators yet, compare the reported size instead of downloading the whole book again. Any
-     * request failure falls back to the cached copy so offline reading keeps working.
-     */
-    private suspend fun revalidateCachedBook(file: File, booksDir: File): DownloadResult {
-        val validators = readBookValidators(booksDir)
-        return try {
-            if (validators != null) {
-                jellyfinRepository.openDownloadStream(
-                    bookId,
-                    validators.eTag,
-                    validators.lastModified,
-                )
-            } else {
-                val remoteSize = jellyfinRepository.getDownloadSize(bookId)
-                if (remoteSize == null || remoteSize == file.length()) {
-                    DownloadResult(
-                        stream = null,
-                        eTag = null,
-                        lastModified = null,
-                        contentLength = file.length(),
-                        notModified = true,
-                    )
-                } else {
-                    jellyfinRepository.openDownloadStream(bookId)
-                }
-            }
-        } catch (e: Exception) {
-            Timber.w(e, "Could not revalidate the cached book; using the cached copy")
-            DownloadResult(
-                stream = null,
-                eTag = null,
-                lastModified = null,
-                contentLength = file.length(),
-                notModified = true,
-            )
-        }
-    }
-
-    private fun storeBookDownload(
-        result: DownloadResult,
-        booksDir: File,
-        existing: File?,
-        container: String?,
-    ): File {
-        val tempFile = File(booksDir, "$bookId.tmp")
-        try {
-            val stream = result.stream ?: throw IOException("Server did not return the book file")
-            stream.use { input ->
-                FileOutputStream(tempFile).use { output -> input.copyTo(output) }
-            }
-        } catch (e: Exception) {
-            tempFile.delete()
-            throw e
-        }
-
-        val detected = detectBookFormat(tempFile, container)
-        val finalExt =
-            container?.lowercase()?.removePrefix(".")?.takeIf { it in BOOK_EXTENSIONS }
-                ?: detected
-        val resolvedFile =
-            safeMoveOrCopy(tempFile, File(booksDir, "$bookId.$finalExt"))
-        if (existing != null && existing != resolvedFile && existing.exists()) {
-            existing.delete()
-        }
-        writeBookValidators(booksDir, result)
-        resolvedFile.setLastModified(System.currentTimeMillis())
-        return resolvedFile
-    }
-
-    private fun touchCachedBook(file: File, booksDir: File) {
-        val now = System.currentTimeMillis()
-        file.setLastModified(now)
-        File(booksDir, "$bookId.meta").takeIf { it.exists() }?.setLastModified(now)
-    }
-
-    private fun readBookValidators(booksDir: File): BookCacheValidators? {
-        val metaFile = File(booksDir, "$bookId.meta")
-        if (!metaFile.exists()) {
-            return null
-        }
-        return try {
-            val json = JSONObject(metaFile.readText())
-            BookCacheValidators(
-                eTag = json.optString("eTag").takeIf { it.isNotBlank() },
-                lastModified = json.optString("lastModified").takeIf { it.isNotBlank() },
-            )
-        } catch (e: Exception) {
-            Timber.w(e, "Could not read cached book validators")
-            null
-        }
-    }
-
-    private fun writeBookValidators(booksDir: File, result: DownloadResult) {
-        val metaFile = File(booksDir, "$bookId.meta")
-        if (result.eTag.isNullOrBlank() && result.lastModified.isNullOrBlank()) {
-            metaFile.delete()
-            return
-        }
-        val json =
-            JSONObject().apply {
-                result.eTag?.let { put("eTag", it) }
-                result.lastModified?.let { put("lastModified", it) }
-            }
-        metaFile.writeText(json.toString())
-    }
-
-    private fun pruneBookCache(booksDir: File) {
-        val now = System.currentTimeMillis()
-        val cutoff = now - BOOK_CACHE_MAX_AGE_MS
-        val tempCutoff = now - BOOK_TEMP_MAX_AGE_MS
-        booksDir.listFiles()?.forEach { file ->
-            if (!file.isFile) {
-                return@forEach
-            }
-            val abandonedTemp =
-                file.name.endsWith(".tmp") && file.lastModified() < tempCutoff
-            if (file.lastModified() < cutoff || abandonedTemp) {
-                file.delete()
-            }
-        }
-    }
-
-    /**
-     * The resolved book file plus the reading position and runtime the server has for it, in ticks.
-     */
-    private data class PreparedBook(
-        val file: File,
-        val serverPositionTicks: Long,
-        val serverRuntimeTicks: Long = 0L,
-        val formatHints: FormatHints? = null,
-    )
-
-    private data class BookCacheValidators(val eTag: String?, val lastModified: String?)
+            .prepare()
 
     private suspend fun openPublication(prepared: PreparedBook, savedInstanceState: Bundle?) {
         this.serverRuntimeTicks = prepared.serverRuntimeTicks
@@ -712,7 +471,7 @@ class BookReaderActivity : AppCompatActivity() {
         }
     }
 
-    private fun locatorKey(bookId: UUID): String =
+    private fun locatorKey(bookId: String): String =
         "$KEY_LOCATOR_PREFIX${jellyfinRepository.getUserId()}_$bookId"
 
     /**
@@ -755,8 +514,8 @@ class BookReaderActivity : AppCompatActivity() {
     ): Locator? {
         if (serverPositionTicks <= 0L) return null
 
-        val totalTicks = calculateTotalTicks(pub, serverRuntimeTicks)
-        val progression = calculateProgressionFromServerTicks(serverPositionTicks, totalTicks)
+        val totalTicks = BookProgress.calculateTotalTicks(pub, serverRuntimeTicks)
+        val progression = BookProgress.calculateProgressionFromServerTicks(serverPositionTicks, totalTicks)
 
         val positions =
             try {
@@ -853,7 +612,7 @@ class BookReaderActivity : AppCompatActivity() {
                         val progressText = "$epubChapterPage/$epubChapterTotalPages"
                         binding.statusPageCount.text = progressText
                         val title =
-                            resolveChapterTitle(
+                            BookProgress.resolveChapterTitle(
                                 locator = locator,
                                 tableOfContents = pub.tableOfContents,
                                 readingOrder = pub.readingOrder,
@@ -955,7 +714,7 @@ class BookReaderActivity : AppCompatActivity() {
                     launch {
                         nav.currentLocator
                             .distinctUntilChangedBy {
-                                calculateProgressTicks(it, publication, serverRuntimeTicks).first
+                                BookProgress.calculateProgressTicks(it, publication, serverRuntimeTicks).first
                             }
                             .debounce(PLAYBACK_PROGRESS_DEBOUNCE_MS)
                             .collect { locator -> postProgress(locator) }
@@ -984,7 +743,7 @@ class BookReaderActivity : AppCompatActivity() {
                 val chapterIndex = pub?.readingOrder?.indexOfFirstWithHref(locator.href)
                 val isScroll = appPreferences.getValue(appPreferences.readerScroll)
                 val (currentPage, totalPages) =
-                    calculateEpubChapterProgress(
+                    BookProgress.calculateEpubChapterProgress(
                         locator = locator,
                         readingOrderIndex = chapterIndex,
                         positionsByReadingOrder = positionsByReadingOrder,
@@ -998,7 +757,7 @@ class BookReaderActivity : AppCompatActivity() {
         binding.statusPageCount.text = progressText
 
         val title =
-            resolveChapterTitle(
+            BookProgress.resolveChapterTitle(
                 locator = locator,
                 tableOfContents = pub?.tableOfContents ?: emptyList(),
                 readingOrder = pub?.readingOrder ?: emptyList(),
@@ -1017,7 +776,7 @@ class BookReaderActivity : AppCompatActivity() {
     }
 
     private suspend fun postProgress(locator: Locator) {
-        val (ticks, _) = calculateProgressTicks(locator, publication, serverRuntimeTicks)
+        val (ticks, _) = BookProgress.calculateProgressTicks(locator, publication, serverRuntimeTicks)
         try {
             jellyfinRepository.postPlaybackProgress(bookUUID, ticks, isPaused = false)
         } catch (e: Exception) {
@@ -1071,7 +830,7 @@ class BookReaderActivity : AppCompatActivity() {
     override fun onStop() {
         super.onStop()
         navigator?.currentLocator?.value?.let { locator ->
-            val (ticks, progression) = calculateProgressTicks(locator, publication, serverRuntimeTicks)
+            val (ticks, progression) = BookProgress.calculateProgressTicks(locator, publication, serverRuntimeTicks)
             val percent = (progression * 100).toInt().coerceIn(0, 100)
             lifecycleScope.launch(Dispatchers.IO) {
                 try {
@@ -1103,91 +862,6 @@ class BookReaderActivity : AppCompatActivity() {
         const val EXTRA_BOOK_CONTAINER = "extra_book_container"
         private const val TAG_NAVIGATOR = "reader_navigator"
         private const val KEY_LOCATOR_PREFIX = "pref_book_locator_"
-        private const val BOOK_CACHE_MAX_AGE_MS = 30L * 24 * 60 * 60 * 1000
-        private const val BOOK_TEMP_MAX_AGE_MS = 24L * 60 * 60 * 1000
-        private val BOOK_EXTENSIONS = setOf("cbz", "cbr", "epub", "pdf")
-        const val TICKS_PER_PAGE = 10_000L
-        const val JELLYFIN_EPUB_TICKS_TOTAL = 10_000_000L
-        const val LEGACY_VIRTUAL_TICKS_TOTAL = 1_000_000_000L
-
-        /**
-         * Calculates total ticks used for progress reporting and tracking.
-         * For EPUB, Jellyfin standardizes RunTimeTicks as 10,000,000L (1 second).
-         * For Divina (CBZ/CBR/PDF), Jellyfin standardizes RunTimeTicks as pageCount * 10,000L.
-         */
-        internal fun calculateTotalTicks(pub: Publication?, serverRuntimeTicks: Long = 0L): Long {
-            if (serverRuntimeTicks > 0L) {
-                return serverRuntimeTicks
-            }
-            if (pub?.conformsTo(Publication.Profile.DIVINA) == true && pub.readingOrder.isNotEmpty()) {
-                return pub.readingOrder.size * TICKS_PER_PAGE
-            }
-            return JELLYFIN_EPUB_TICKS_TOTAL
-        }
-
-        /**
-         * Calculates playback position ticks and normalized progression for a locator.
-         */
-        internal fun calculateProgressTicks(
-            locator: Locator,
-            pub: Publication?,
-            serverRuntimeTicks: Long = 0L,
-        ): Pair<Long, Double> {
-            val totalTicks = calculateTotalTicks(pub, serverRuntimeTicks)
-            if (pub?.conformsTo(Publication.Profile.DIVINA) == true) {
-                val totalPages = pub.readingOrder.size
-                val pageIndex =
-                    locator.locations.position?.let { it - 1 }
-                        ?: pub.readingOrder.indexOfFirstWithHref(locator.href)?.takeIf { it >= 0 }
-                        ?: if (totalPages > 0) {
-                            ((locator.locations.totalProgression ?: 0.0) * totalPages).toInt()
-                        } else {
-                            0
-                        }
-                val clampedIndex = if (totalPages > 0) pageIndex.coerceIn(0, totalPages - 1) else 0
-                val progression =
-                    if (totalPages > 0) {
-                        (clampedIndex.toDouble() / totalPages).coerceIn(0.0, 1.0)
-                    } else {
-                        0.0
-                    }
-                val ticks =
-                    if (totalTicks == totalPages * TICKS_PER_PAGE) {
-                        clampedIndex * TICKS_PER_PAGE
-                    } else if (totalPages > 0) {
-                        (progression * totalTicks).toLong()
-                    } else {
-                        0L
-                    }
-                return Pair(ticks.coerceIn(0L, totalTicks), progression)
-            } else {
-                val progression = (locator.locations.totalProgression ?: 0.0).coerceIn(0.0, 1.0)
-                val ticks = (progression * totalTicks).toLong().coerceIn(0L, totalTicks)
-                return Pair(ticks, progression)
-            }
-        }
-
-        /**
-         * Calculates a normalized progression (0.0 to 1.0) from the server's position ticks.
-         * Handles legacy virtual ticks (1,000,000,000L scale) gracefully if present on older records.
-         */
-        internal fun calculateProgressionFromServerTicks(
-            serverPositionTicks: Long,
-            totalTicks: Long,
-        ): Double {
-            if (serverPositionTicks <= 0L) return 0.0
-            return if (
-                serverPositionTicks > totalTicks &&
-                    totalTicks > 0L &&
-                    serverPositionTicks <= LEGACY_VIRTUAL_TICKS_TOTAL
-            ) {
-                (serverPositionTicks.toDouble() / LEGACY_VIRTUAL_TICKS_TOTAL).coerceIn(0.0, 1.0)
-            } else if (totalTicks > 0L) {
-                (serverPositionTicks.toDouble() / totalTicks).coerceIn(0.0, 1.0)
-            } else {
-                0.0
-            }
-        }
 
         /**
          * How long to wait after the last locator change before reporting progress to the server.
@@ -1209,262 +883,6 @@ class BookReaderActivity : AppCompatActivity() {
                     putExtra(EXTRA_BOOK_CONTAINER, container)
                 }
             }
-        }
-
-        internal fun detectBookFormat(file: File, containerHint: String? = null): String {
-            val header = ByteArray(7)
-            try {
-                FileInputStream(file).use { input -> input.read(header) }
-            } catch (_: Exception) {}
-
-            if (
-                header.size >= 4 &&
-                    header[0] == 0x25.toByte() &&
-                    header[1] == 0x50.toByte() &&
-                    header[2] == 0x44.toByte() &&
-                    header[3] == 0x46.toByte()
-            ) {
-                return "pdf"
-            }
-
-            if (
-                header.size >= 4 &&
-                    header[0] == 0x52.toByte() &&
-                    header[1] == 0x61.toByte() &&
-                    header[2] == 0x72.toByte() &&
-                    header[3] == 0x21.toByte()
-            ) {
-                return "cbr"
-            }
-
-            val comicImageExtensions =
-                setOf(
-                    "jpg",
-                    "jpeg",
-                    "png",
-                    "webp",
-                    "avif",
-                    "gif",
-                    "bmp",
-                    "dib",
-                    "tif",
-                    "tiff",
-                    "jxl",
-                )
-
-            // Try opening as ZIP. Use UTF-8 first, and fall back to ISO-8859-1 for non-UTF8 entry
-            // encodings (e.g. Shift-JIS manga).
-            val zipFile =
-                try {
-                    ZipFile(file, StandardCharsets.UTF_8)
-                } catch (_: Exception) {
-                    try {
-                        ZipFile(file, StandardCharsets.ISO_8859_1)
-                    } catch (_: Exception) {
-                        null
-                    }
-                }
-
-            zipFile?.use { zip ->
-                // 1. Strict EPUB verification:
-                // Standard EPUB must contain META-INF/container.xml
-                if (zip.getEntry("META-INF/container.xml") != null) {
-                    return "epub"
-                }
-                // If it has a mimetype entry, check if its content is application/epub+zip
-                val mimetypeEntry = zip.getEntry("mimetype")
-                if (mimetypeEntry != null) {
-                    try {
-                        val mimeContent =
-                            zip.getInputStream(mimetypeEntry).use {
-                                it.bufferedReader(StandardCharsets.US_ASCII).readText().trim()
-                            }
-                        if (mimeContent.startsWith("application/epub+zip", ignoreCase = true)) {
-                            return "epub"
-                        }
-                        if (
-                            mimeContent.startsWith(
-                                "application/vnd.comicbook+zip",
-                                ignoreCase = true,
-                            ) || mimeContent.startsWith("application/x-cbz", ignoreCase = true)
-                        ) {
-                            return "cbz"
-                        }
-                    } catch (_: Exception) {}
-                }
-
-                // 2. Comic verification:
-                // ComicRack / Komga metadata or comic images
-                if (zip.getEntry("ComicInfo.xml") != null) {
-                    return "cbz"
-                }
-
-                val hasImages =
-                    zip.entries().asSequence().any { entry ->
-                        if (entry.isDirectory) return@any false
-                        val ext = entry.name.substringAfterLast('.', "").lowercase()
-                        ext in comicImageExtensions
-                    }
-                if (hasImages) {
-                    return "cbz"
-                }
-            }
-
-            // 3. Fallback based on hint or file extension
-            val normalizedHint = containerHint?.lowercase()?.removePrefix(".")
-            if (normalizedHint in listOf("cbz", "cbr", "epub", "pdf")) {
-                return normalizedHint!!
-            }
-            if (normalizedHint == "zip") {
-                return "cbz"
-            }
-
-            val fileExt = file.extension.lowercase()
-            if (fileExt in listOf("cbz", "cbr", "epub", "pdf")) {
-                return fileExt
-            }
-
-            return "epub"
-        }
-
-        internal fun safeMoveOrCopy(source: File, target: File): File {
-            if (source.absolutePath == target.absolutePath) return source
-            if (target.exists()) {
-                target.delete()
-            }
-            if (source.renameTo(target)) {
-                return target
-            }
-            try {
-                source.copyTo(target, overwrite = true)
-                source.delete()
-                if (target.exists() && target.length() > 0) {
-                    return target
-                }
-            } catch (e: Exception) {
-                Timber.w(e, "Failed to copy file from ${source.name} to ${target.name}")
-            }
-            return source
-        }
-
-        internal fun buildFormatHints(ext: String): FormatHints {
-            val mediaType =
-                when (ext.lowercase()) {
-                    "cbz" -> MediaType.CBZ
-                    "epub" -> MediaType.EPUB
-                    "pdf" -> MediaType.PDF
-                    else -> null
-                }
-            return FormatHints(mediaTypes = listOfNotNull(mediaType)).addFileExtension(ext)
-        }
-
-        internal fun calculateEpubChapterProgress(
-            locator: Locator,
-            readingOrderIndex: Int?,
-            positionsByReadingOrder: List<List<Locator>>,
-            cachedChapterHref: Url? = null,
-            cachedPage: Int? = null,
-            cachedTotalPages: Int? = null,
-            isScrollMode: Boolean = false,
-        ): Pair<Int, Int> {
-            val normalizedHref = locator.href.removeFragment().removeQuery()
-            val totalPages =
-                if (
-                    !isScrollMode &&
-                        cachedChapterHref == normalizedHref &&
-                        cachedTotalPages != null &&
-                        cachedTotalPages > 0
-                ) {
-                    cachedTotalPages
-                } else if (
-                    readingOrderIndex != null &&
-                        readingOrderIndex in positionsByReadingOrder.indices
-                ) {
-                    positionsByReadingOrder[readingOrderIndex].size.coerceAtLeast(1)
-                } else {
-                    1
-                }
-            val currentPage =
-                if (
-                    !isScrollMode &&
-                        cachedChapterHref == normalizedHref &&
-                        cachedPage != null &&
-                        cachedPage in 1..totalPages
-                ) {
-                    cachedPage
-                } else {
-                    val progression = locator.locations.progression ?: 0.0
-                    ((progression + 1e-5) * totalPages).toInt().coerceIn(0, totalPages - 1) + 1
-                }
-            return currentPage to totalPages
-        }
-
-        private fun findExactTitleInToc(links: List<Link>, targetHref: Url): String? {
-            for (link in links) {
-                if (link.url() == targetHref && !link.title.isNullOrBlank()) {
-                    return link.title!!.trim()
-                }
-                val childResult = findExactTitleInToc(link.children, targetHref)
-                if (!childResult.isNullOrBlank()) {
-                    return childResult
-                }
-            }
-            return null
-        }
-
-        private fun findNormalizedTitleInToc(links: List<Link>, targetNormalized: Url): String? {
-            for (link in links) {
-                if (
-                    link.url().removeFragment().removeQuery() == targetNormalized &&
-                        !link.title.isNullOrBlank()
-                ) {
-                    return link.title!!.trim()
-                }
-                val childResult = findNormalizedTitleInToc(link.children, targetNormalized)
-                if (!childResult.isNullOrBlank()) {
-                    return childResult
-                }
-            }
-            return null
-        }
-
-        internal fun findTitleInToc(links: List<Link>, targetHref: Url): String? {
-            val exactResult = findExactTitleInToc(links, targetHref)
-            if (!exactResult.isNullOrBlank()) {
-                return exactResult
-            }
-            val targetNormalized = targetHref.removeFragment().removeQuery()
-            return findNormalizedTitleInToc(links, targetNormalized)
-        }
-
-        internal fun resolveChapterTitle(
-            locator: Locator?,
-            tableOfContents: List<Link> = emptyList(),
-            readingOrder: List<Link> = emptyList(),
-            bookTitle: String = "",
-        ): String {
-            val directTitle = locator?.title?.trim()
-            if (!directTitle.isNullOrEmpty()) {
-                return directTitle
-            }
-
-            if (locator != null) {
-                val tocTitle = findTitleInToc(tableOfContents, locator.href)
-                if (!tocTitle.isNullOrBlank()) {
-                    return tocTitle
-                }
-
-                val targetNormalized = locator.href.removeFragment().removeQuery()
-                val readingOrderItem = readingOrder.firstOrNull {
-                    it.url().removeFragment().removeQuery() == targetNormalized
-                }
-                val readingOrderTitle = readingOrderItem?.title?.trim()
-                if (!readingOrderTitle.isNullOrEmpty()) {
-                    return readingOrderTitle
-                }
-            }
-
-            return bookTitle.trim()
         }
     }
 }
