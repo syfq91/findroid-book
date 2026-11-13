@@ -106,7 +106,7 @@ fun DownloadButton(
             modifier = modifier,
         ) {
             Icon(
-                painter = painterResource(CoreR.drawable.ic_trash),
+                painter = painterResource(CoreR.drawable.ic_cloud_done),
                 contentDescription = null,
             )
         }
@@ -124,7 +124,7 @@ fun DownloadButton(
             modifier = modifier,
         ) {
             Icon(
-                painter = painterResource(CoreR.drawable.ic_download),
+                painter = painterResource(CoreR.drawable.ic_cloud_download),
                 contentDescription = null,
             )
         }
