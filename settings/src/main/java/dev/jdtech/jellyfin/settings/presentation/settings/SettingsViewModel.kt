@@ -288,6 +288,9 @@ class SettingsViewModel @Inject constructor(private val appPreferences: AppPrefe
                                                         R.string.pref_player_exo_libass_summary,
                                                     backendPreference =
                                                         appPreferences.playerExoLibass,
+                                                    visibleForPreference =
+                                                        appPreferences.playerBackend,
+                                                    visibleForValues = setOf("exoplayer"),
                                                 ),
                                                 PreferenceCategory(
                                                     nameStringResource = R.string.mpv_options,
@@ -873,6 +876,14 @@ class SettingsViewModel @Inject constructor(private val appPreferences: AppPrefe
                                         preference.minSdk?.let { sdk ->
                                             Build.VERSION.SDK_INT >= sdk
                                         } ?: true
+                                    }
+                                    .filter { preference ->
+                                        val switch = preference as? PreferenceSwitch
+                                        val source = switch?.visibleForPreference
+                                        val values = switch?.visibleForValues
+                                        source == null ||
+                                            (values != null &&
+                                                appPreferences.getValue(source) in values)
                                     }
                                     .map { preference ->
                                         when (preference) {
