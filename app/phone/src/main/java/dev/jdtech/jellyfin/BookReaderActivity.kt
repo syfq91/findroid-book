@@ -34,6 +34,7 @@ import dev.jdtech.jellyfin.models.FindroidSourceType
 import dev.jdtech.jellyfin.presentation.book.components.ReaderAppearanceSheet
 import dev.jdtech.jellyfin.presentation.book.components.ReaderPreferencesState
 import dev.jdtech.jellyfin.presentation.theme.FindroidTheme
+import dev.jdtech.jellyfin.repository.DownloadResult
 import dev.jdtech.jellyfin.repository.JellyfinRepository
 import dev.jdtech.jellyfin.settings.domain.AppPreferences
 import java.io.File
@@ -431,56 +432,50 @@ class BookReaderActivity : AppCompatActivity() {
                 Timber.w(e, "Could not fetch book details or local source")
             }
 
-            val booksDir = File(cacheDir, "books").apply { mkdirs() }
-            val existing =
-                booksDir
-                    .listFiles { _, name -> name.startsWith("$bookId.") && !name.endsWith(".tmp") }
-                    ?.firstOrNull { it.length() > 0 }
+            // Keep reader copies in filesDir so the OS does not evict them as cache, and prune
+            // entries that have not been opened for a while.
+            val booksDir = File(filesDir, "books").apply { mkdirs() }
+            pruneBookCache(booksDir)
+            val existing = findCachedBook(booksDir)
             if (existing != null) {
-                val detected = detectBookFormat(existing, container)
-                val targetExt =
-                    container?.lowercase()?.removePrefix(".")?.takeIf {
-                        it in listOf("cbz", "cbr", "epub", "pdf")
-                    } ?: detected
-                val resolvedFile =
-                    if (
-                        existing.extension.lowercase() != targetExt &&
-                            (targetExt in listOf("cbz", "cbr", "epub", "pdf"))
-                    ) {
-                        val corrected = File(booksDir, "$bookId.$targetExt")
-                        safeMoveOrCopy(existing, corrected)
+                val resolvedFile = normalizeCachedBookExtension(existing, booksDir, container)
+                val revalidation = revalidateCachedBook(resolvedFile, booksDir)
+                val preparedFile =
+                    if (revalidation.notModified) {
+                        touchCachedBook(resolvedFile, booksDir)
+                        resolvedFile
                     } else {
-                        existing
+                        storeBookDownload(
+                            result = revalidation,
+                            booksDir = booksDir,
+                            existing = resolvedFile,
+                            container = container,
+                        )
                     }
-                val finalExt = resolvedFile.extension.lowercase().ifBlank { targetExt }
+                val finalExt = preparedFile.extension.lowercase().ifBlank {
+                    detectBookFormat(preparedFile, container)
+                }
                 val hints = buildFormatHints(finalExt)
                 return@withContext PreparedBook(
-                    file = resolvedFile,
+                    file = preparedFile,
                     serverPositionTicks = serverPositionTicks,
                     serverRuntimeTicks = serverRuntimeTicks,
                     formatHints = hints,
                 )
             }
 
-            val tempFile = File(booksDir, "$bookId.tmp")
-
-            try {
-                jellyfinRepository.openDownloadStream(bookUUID).use { input ->
-                    FileOutputStream(tempFile).use { output -> input.copyTo(output) }
-                }
-            } catch (e: Exception) {
-                tempFile.delete()
-                throw e
-            }
-
-            val detected = detectBookFormat(tempFile, container)
+            val result = jellyfinRepository.openDownloadStream(bookUUID)
+            val resolvedFile =
+                storeBookDownload(
+                    result = result,
+                    booksDir = booksDir,
+                    existing = null,
+                    container = container,
+                )
             val finalExt =
-                container?.lowercase()?.removePrefix(".")?.takeIf {
-                    it in listOf("cbz", "cbr", "epub", "pdf")
-                } ?: detected
-
-            val targetFile = File(booksDir, "$bookId.$finalExt")
-            val resolvedFile = safeMoveOrCopy(tempFile, targetFile)
+                resolvedFile.extension.lowercase().ifBlank {
+                    detectBookFormat(resolvedFile, container)
+                }
             val hints = buildFormatHints(finalExt)
             PreparedBook(
                 file = resolvedFile,
@@ -489,6 +484,154 @@ class BookReaderActivity : AppCompatActivity() {
                 formatHints = hints,
             )
         }
+
+    private fun findCachedBook(booksDir: File): File? =
+        booksDir
+            .listFiles { _, name ->
+                name.startsWith("$bookId.") &&
+                    !name.endsWith(".tmp") &&
+                    !name.endsWith(".meta")
+            }
+            ?.firstOrNull { it.length() > 0 }
+
+    private fun normalizeCachedBookExtension(
+        file: File,
+        booksDir: File,
+        container: String?,
+    ): File {
+        val detected = detectBookFormat(file, container)
+        val targetExt =
+            container?.lowercase()?.removePrefix(".")?.takeIf { it in BOOK_EXTENSIONS } ?: detected
+        return if (file.extension.lowercase() != targetExt && targetExt in BOOK_EXTENSIONS) {
+            safeMoveOrCopy(file, File(booksDir, "$bookId.$targetExt"))
+        } else {
+            file
+        }
+    }
+
+    /**
+     * Revalidates a cached copy with conditional headers. When the server does not provide
+     * validators yet, compare the reported size instead of downloading the whole book again. Any
+     * request failure falls back to the cached copy so offline reading keeps working.
+     */
+    private suspend fun revalidateCachedBook(file: File, booksDir: File): DownloadResult {
+        val validators = readBookValidators(booksDir)
+        return try {
+            if (validators != null) {
+                jellyfinRepository.openDownloadStream(
+                    bookId,
+                    validators.eTag,
+                    validators.lastModified,
+                )
+            } else {
+                val remoteSize = jellyfinRepository.getDownloadSize(bookId)
+                if (remoteSize == null || remoteSize == file.length()) {
+                    DownloadResult(
+                        stream = null,
+                        eTag = null,
+                        lastModified = null,
+                        contentLength = file.length(),
+                        notModified = true,
+                    )
+                } else {
+                    jellyfinRepository.openDownloadStream(bookId)
+                }
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "Could not revalidate the cached book; using the cached copy")
+            DownloadResult(
+                stream = null,
+                eTag = null,
+                lastModified = null,
+                contentLength = file.length(),
+                notModified = true,
+            )
+        }
+    }
+
+    private fun storeBookDownload(
+        result: DownloadResult,
+        booksDir: File,
+        existing: File?,
+        container: String?,
+    ): File {
+        val tempFile = File(booksDir, "$bookId.tmp")
+        try {
+            val stream = result.stream ?: throw IOException("Server did not return the book file")
+            stream.use { input ->
+                FileOutputStream(tempFile).use { output -> input.copyTo(output) }
+            }
+        } catch (e: Exception) {
+            tempFile.delete()
+            throw e
+        }
+
+        val detected = detectBookFormat(tempFile, container)
+        val finalExt =
+            container?.lowercase()?.removePrefix(".")?.takeIf { it in BOOK_EXTENSIONS }
+                ?: detected
+        val resolvedFile =
+            safeMoveOrCopy(tempFile, File(booksDir, "$bookId.$finalExt"))
+        if (existing != null && existing != resolvedFile && existing.exists()) {
+            existing.delete()
+        }
+        writeBookValidators(booksDir, result)
+        resolvedFile.setLastModified(System.currentTimeMillis())
+        return resolvedFile
+    }
+
+    private fun touchCachedBook(file: File, booksDir: File) {
+        val now = System.currentTimeMillis()
+        file.setLastModified(now)
+        File(booksDir, "$bookId.meta").takeIf { it.exists() }?.setLastModified(now)
+    }
+
+    private fun readBookValidators(booksDir: File): BookCacheValidators? {
+        val metaFile = File(booksDir, "$bookId.meta")
+        if (!metaFile.exists()) {
+            return null
+        }
+        return try {
+            val json = JSONObject(metaFile.readText())
+            BookCacheValidators(
+                eTag = json.optString("eTag").takeIf { it.isNotBlank() },
+                lastModified = json.optString("lastModified").takeIf { it.isNotBlank() },
+            )
+        } catch (e: Exception) {
+            Timber.w(e, "Could not read cached book validators")
+            null
+        }
+    }
+
+    private fun writeBookValidators(booksDir: File, result: DownloadResult) {
+        val metaFile = File(booksDir, "$bookId.meta")
+        if (result.eTag.isNullOrBlank() && result.lastModified.isNullOrBlank()) {
+            metaFile.delete()
+            return
+        }
+        val json =
+            JSONObject().apply {
+                result.eTag?.let { put("eTag", it) }
+                result.lastModified?.let { put("lastModified", it) }
+            }
+        metaFile.writeText(json.toString())
+    }
+
+    private fun pruneBookCache(booksDir: File) {
+        val now = System.currentTimeMillis()
+        val cutoff = now - BOOK_CACHE_MAX_AGE_MS
+        val tempCutoff = now - BOOK_TEMP_MAX_AGE_MS
+        booksDir.listFiles()?.forEach { file ->
+            if (!file.isFile) {
+                return@forEach
+            }
+            val abandonedTemp =
+                file.name.endsWith(".tmp") && file.lastModified() < tempCutoff
+            if (file.lastModified() < cutoff || abandonedTemp) {
+                file.delete()
+            }
+        }
+    }
 
     /**
      * The resolved book file plus the reading position and runtime the server has for it, in ticks.
@@ -499,6 +642,8 @@ class BookReaderActivity : AppCompatActivity() {
         val serverRuntimeTicks: Long = 0L,
         val formatHints: FormatHints? = null,
     )
+
+    private data class BookCacheValidators(val eTag: String?, val lastModified: String?)
 
     private suspend fun openPublication(prepared: PreparedBook, savedInstanceState: Bundle?) {
         this.serverRuntimeTicks = prepared.serverRuntimeTicks
@@ -958,6 +1103,9 @@ class BookReaderActivity : AppCompatActivity() {
         const val EXTRA_BOOK_CONTAINER = "extra_book_container"
         private const val TAG_NAVIGATOR = "reader_navigator"
         private const val KEY_LOCATOR_PREFIX = "pref_book_locator_"
+        private const val BOOK_CACHE_MAX_AGE_MS = 30L * 24 * 60 * 60 * 1000
+        private const val BOOK_TEMP_MAX_AGE_MS = 24L * 60 * 60 * 1000
+        private val BOOK_EXTENSIONS = setOf("cbz", "cbr", "epub", "pdf")
         const val TICKS_PER_PAGE = 10_000L
         const val JELLYFIN_EPUB_TICKS_TOTAL = 10_000_000L
         const val LEGACY_VIRTUAL_TICKS_TOTAL = 1_000_000_000L

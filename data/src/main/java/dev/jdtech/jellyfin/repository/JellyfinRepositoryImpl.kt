@@ -635,7 +635,11 @@ class JellyfinRepositoryImpl(
             }
         }
 
-    override suspend fun openDownloadStream(itemId: UUID): InputStream =
+    override suspend fun openDownloadStream(
+        itemId: UUID,
+        eTag: String?,
+        lastModified: String?,
+    ): DownloadResult =
         withContext(Dispatchers.IO) {
             val baseUrl = getBaseUrl().trimEnd('/')
             val authorization =
@@ -648,15 +652,40 @@ class JellyfinRepositoryImpl(
                         connectTimeout = 15000
                         readTimeout = 30000
                         setRequestProperty("Authorization", authorization)
+                        if (!eTag.isNullOrBlank()) {
+                            setRequestProperty("If-None-Match", eTag)
+                        }
+                        if (!lastModified.isNullOrBlank()) {
+                            setRequestProperty("If-Modified-Since", lastModified)
+                        }
                         connect()
                     }
 
-            if (connection.responseCode in 200..299) {
-                connection.inputStream
-            } else {
-                val code = connection.responseCode
-                connection.disconnect()
-                throw IOException("Download failed with HTTP $code")
+            val code = connection.responseCode
+            when {
+                code == HttpURLConnection.HTTP_NOT_MODIFIED -> {
+                    connection.disconnect()
+                    DownloadResult(
+                        stream = null,
+                        eTag = eTag,
+                        lastModified = lastModified,
+                        contentLength = 0L,
+                        notModified = true,
+                    )
+                }
+                code in 200..299 -> {
+                    DownloadResult(
+                        stream = connection.inputStream,
+                        eTag = connection.getHeaderField("ETag"),
+                        lastModified = connection.getHeaderField("Last-Modified"),
+                        contentLength = connection.contentLengthLong,
+                        notModified = false,
+                    )
+                }
+                else -> {
+                    connection.disconnect()
+                    throw IOException("Download failed with HTTP $code")
+                }
             }
         }
 

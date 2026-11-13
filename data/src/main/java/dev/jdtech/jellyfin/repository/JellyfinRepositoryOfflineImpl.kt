@@ -344,7 +344,11 @@ class JellyfinRepositoryOfflineImpl(
 
     override suspend fun getDownloadSize(itemId: UUID): Long? = null
 
-    override suspend fun openDownloadStream(itemId: UUID): InputStream {
+    override suspend fun openDownloadStream(
+        itemId: UUID,
+        eTag: String?,
+        lastModified: String?,
+    ): DownloadResult {
         // Offline mode has no server to stream a download from. Callers are expected to use a
         // local source instead; surface a clear failure if one is requested.
         throw IOException("Downloads are unavailable in offline mode")

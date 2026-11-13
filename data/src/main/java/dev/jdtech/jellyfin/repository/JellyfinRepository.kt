@@ -141,8 +141,15 @@ interface JellyfinRepository {
      * Opens an authenticated stream to the item's download using an `Authorization` header, rather
      * than embedding the access token in the URL. Callers that can send headers should prefer this
      * over [getDownloadUrl]; the token in a URL can leak into logs and error messages.
+     *
+     * When [eTag] or [lastModified] is supplied, the request is conditional. A `304 Not Modified`
+     * response is reported through [DownloadResult.notModified] and has no stream.
      */
-    suspend fun openDownloadStream(itemId: UUID): InputStream
+    suspend fun openDownloadStream(
+        itemId: UUID,
+        eTag: String? = null,
+        lastModified: String? = null,
+    ): DownloadResult
 
     suspend fun updateDeviceName(name: String)
 
@@ -152,3 +159,14 @@ interface JellyfinRepository {
 
     fun getUserId(): UUID
 }
+
+/**
+ * The result of an authenticated download request. [stream] is null when [notModified] is true.
+ */
+data class DownloadResult(
+    val stream: InputStream?,
+    val eTag: String?,
+    val lastModified: String?,
+    val contentLength: Long,
+    val notModified: Boolean,
+)
