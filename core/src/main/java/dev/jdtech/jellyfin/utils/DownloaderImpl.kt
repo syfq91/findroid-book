@@ -86,11 +86,12 @@ class DownloaderImpl(
             val downloadSize =
                 if (source.size > 0) source.size
                 else jellyfinRepository.getDownloadSize(item.id) ?: 0L
-            val resolvedSource = if (source.size <= 0 && downloadSize > 0) {
-                source.copy(size = downloadSize)
-            } else {
-                source
-            }
+            val resolvedSource =
+                if (source.size <= 0 && downloadSize > 0) {
+                    source.copy(size = downloadSize)
+                } else {
+                    source
+                }
             if (downloadSize > 0 && stats.availableBytes < downloadSize) {
                 return@coroutineScope Pair(
                     -1,

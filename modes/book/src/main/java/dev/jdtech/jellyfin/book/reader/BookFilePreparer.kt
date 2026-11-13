@@ -258,8 +258,7 @@ class BookFilePreparer(
             if (!file.isFile) {
                 return@forEach
             }
-            val abandonedTemp =
-                file.name.endsWith(".tmp") && file.lastModified() < tempCutoff
+            val abandonedTemp = file.name.endsWith(".tmp") && file.lastModified() < tempCutoff
             if (file.lastModified() < cutoff || abandonedTemp) {
                 file.delete()
             }

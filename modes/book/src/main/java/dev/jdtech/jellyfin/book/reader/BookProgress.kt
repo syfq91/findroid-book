@@ -108,8 +108,7 @@ object BookProgress {
             ) {
                 cachedTotalPages
             } else if (
-                readingOrderIndex != null &&
-                    readingOrderIndex in positionsByReadingOrder.indices
+                readingOrderIndex != null && readingOrderIndex in positionsByReadingOrder.indices
             ) {
                 positionsByReadingOrder[readingOrderIndex].size.coerceAtLeast(1)
             } else {
@@ -186,10 +185,9 @@ object BookProgress {
             }
 
             val targetNormalized = locator.href.removeFragment().removeQuery()
-            val readingOrderItem =
-                readingOrder.firstOrNull {
-                    it.url().removeFragment().removeQuery() == targetNormalized
-                }
+            val readingOrderItem = readingOrder.firstOrNull {
+                it.url().removeFragment().removeQuery() == targetNormalized
+            }
             val readingOrderTitle = readingOrderItem?.title?.trim()
             if (!readingOrderTitle.isNullOrEmpty()) {
                 return readingOrderTitle

@@ -738,13 +738,11 @@ class CbzTest {
         assertEquals(2.0 / 3.0, p3Prog, 0.0001)
 
         // Server tick restoration (normal Jellyfin tick for page 2)
-        val restoredProg =
-            BookProgress.calculateProgressionFromServerTicks(10_000L, totalTicks)
+        val restoredProg = BookProgress.calculateProgressionFromServerTicks(10_000L, totalTicks)
         assertEquals(1.0 / 3.0, restoredProg, 0.0001)
 
         // Server tick restoration (legacy Findroid 1B virtual tick scale for page 2)
-        val legacyServerTicks =
-            ((1.0 / 3.0) * BookProgress.LEGACY_VIRTUAL_TICKS_TOTAL).toLong()
+        val legacyServerTicks = ((1.0 / 3.0) * BookProgress.LEGACY_VIRTUAL_TICKS_TOTAL).toLong()
         val restoredLegacyProg =
             BookProgress.calculateProgressionFromServerTicks(legacyServerTicks, totalTicks)
         assertEquals(1.0 / 3.0, restoredLegacyProg, 0.001)

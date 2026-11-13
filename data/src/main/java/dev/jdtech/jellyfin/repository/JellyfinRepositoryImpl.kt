@@ -31,7 +31,6 @@ import dev.jdtech.jellyfin.models.toFindroidSource
 import dev.jdtech.jellyfin.settings.domain.AppPreferences
 import java.io.File
 import java.io.IOException
-import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.UUID
@@ -611,8 +610,7 @@ class JellyfinRepositoryImpl(
             val authorization = getAuthorizationHeader() ?: return@withContext null
             try {
                 val connection =
-                    (URL("$baseUrl/Items/$itemId/Download").openConnection()
-                            as HttpURLConnection)
+                    (URL("$baseUrl/Items/$itemId/Download").openConnection() as HttpURLConnection)
                         .apply {
                             requestMethod = "HEAD"
                             connectTimeout = 15000

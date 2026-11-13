@@ -15,7 +15,9 @@ data class PreferenceSwitch(
     val onClick: (PreferenceSwitch) -> Unit = {},
     val backendPreference: PreferenceBackend<Boolean>,
     val value: Boolean = false,
-    /** When set, only show this switch while [visibleForPreference] has one of [visibleForValues]. */
+    /**
+     * When set, only show this switch while [visibleForPreference] has one of [visibleForValues].
+     */
     val visibleForPreference: PreferenceBackend<String>? = null,
     val visibleForValues: Set<String>? = null,
 ) : Preference

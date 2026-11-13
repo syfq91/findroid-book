@@ -12,7 +12,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 @HiltViewModel
-class MediaViewModel @Inject constructor(
+class MediaViewModel
+@Inject
+constructor(
     private val repository: JellyfinRepository,
     private val itemCapabilities: ItemCapabilities,
 ) : ViewModel() {

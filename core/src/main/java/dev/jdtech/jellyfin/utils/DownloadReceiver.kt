@@ -74,9 +74,7 @@ class DownloadReceiver : BroadcastReceiver() {
                             )
                             val userId = repository.getUserId()
                             val item =
-                                database
-                                    .findMovie(source.itemId)
-                                    ?.toFindroidMovie(database, userId)
+                                database.findMovie(source.itemId)?.toFindroidMovie(database, userId)
                                     ?: database
                                         .findEpisode(source.itemId)
                                         ?.toFindroidEpisode(database, userId)

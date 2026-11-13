@@ -107,6 +107,6 @@ fun FindroidEpisodeDto.toLocalFindroidImages(itemId: UUID): FindroidImages {
 
 fun FindroidBookDto.toLocalFindroidImages(itemId: UUID): FindroidImages {
     return FindroidImages(
-        primary = Uri.Builder().appendEncodedPath("images/$itemId/primary").build(),
+        primary = Uri.Builder().appendEncodedPath("images/$itemId/primary").build()
     )
 }

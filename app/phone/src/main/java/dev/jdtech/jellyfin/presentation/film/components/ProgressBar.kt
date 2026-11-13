@@ -18,7 +18,8 @@ import dev.jdtech.jellyfin.presentation.theme.FindroidTheme
 @Composable
 fun ProgressBar(item: FindroidItem, width: Int, modifier: Modifier = Modifier) {
     if (item.runtimeTicks <= 0L || item.playbackPositionTicks <= 0L) return
-    val progress = (item.playbackPositionTicks.toFloat() / item.runtimeTicks.toFloat()).coerceIn(0f, 1f)
+    val progress =
+        (item.playbackPositionTicks.toFloat() / item.runtimeTicks.toFloat()).coerceIn(0f, 1f)
     Column(modifier = modifier) {
         Box(
             modifier =

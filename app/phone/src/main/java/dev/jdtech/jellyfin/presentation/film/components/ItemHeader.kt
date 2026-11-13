@@ -102,9 +102,7 @@ private fun resolveBackdropUri(context: Context, item: FindroidItem): Uri? {
         val file = File(context.filesDir, backdropUri.path.orEmpty())
         backdropUri =
             if (
-                !file.exists() &&
-                    item.images.primary != null &&
-                    item.images.primary != backdropUri
+                !file.exists() && item.images.primary != null && item.images.primary != backdropUri
             ) {
                 val primaryPath = item.images.primary?.path.orEmpty()
                 val primaryFile = File(context.filesDir, primaryPath)

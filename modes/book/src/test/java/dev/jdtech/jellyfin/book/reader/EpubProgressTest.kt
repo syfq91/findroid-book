@@ -253,8 +253,7 @@ class EpubProgressTest {
 
     @Test
     fun testCalculateTotalTicksForEpub() {
-        val defaultTicks =
-            BookProgress.calculateTotalTicks(pub = null, serverRuntimeTicks = 0L)
+        val defaultTicks = BookProgress.calculateTotalTicks(pub = null, serverRuntimeTicks = 0L)
         assertEquals(BookProgress.JELLYFIN_EPUB_TICKS_TOTAL, defaultTicks)
         assertEquals(10_000_000L, defaultTicks)
 
@@ -271,8 +270,7 @@ class EpubProgressTest {
                 mediaType = MediaType.XHTML,
                 locations = Locator.Locations(totalProgression = 0.0),
             )
-        val (startTicks, startProg) =
-            BookProgress.calculateProgressTicks(startLocator, pub = null)
+        val (startTicks, startProg) = BookProgress.calculateProgressTicks(startLocator, pub = null)
         assertEquals(0L, startTicks)
         assertEquals(0.0, startProg, 0.0001)
 
@@ -293,8 +291,7 @@ class EpubProgressTest {
                 mediaType = MediaType.XHTML,
                 locations = Locator.Locations(totalProgression = 1.0),
             )
-        val (endTicks, endProg) =
-            BookProgress.calculateProgressTicks(endLocator, pub = null)
+        val (endTicks, endProg) = BookProgress.calculateProgressTicks(endLocator, pub = null)
         assertEquals(10_000_000L, endTicks)
         assertEquals(1.0, endProg, 0.0001)
 
@@ -304,8 +301,7 @@ class EpubProgressTest {
                 mediaType = MediaType.XHTML,
                 locations = Locator.Locations(),
             )
-        val (nullTicks, nullProg) =
-            BookProgress.calculateProgressTicks(nullProgLocator, pub = null)
+        val (nullTicks, nullProg) = BookProgress.calculateProgressTicks(nullProgLocator, pub = null)
         assertEquals(0L, nullTicks)
         assertEquals(0.0, nullProg, 0.0001)
     }

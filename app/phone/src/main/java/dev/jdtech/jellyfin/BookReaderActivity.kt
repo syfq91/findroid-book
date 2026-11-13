@@ -28,16 +28,14 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import dagger.hilt.android.AndroidEntryPoint
-import dev.jdtech.jellyfin.core.R as CoreR
-import dev.jdtech.jellyfin.databinding.ActivityBookReaderBinding
-import dev.jdtech.jellyfin.models.FindroidSourceType
-import dev.jdtech.jellyfin.presentation.book.components.ReaderAppearanceSheet
-import dev.jdtech.jellyfin.presentation.book.components.ReaderPreferencesState
-import dev.jdtech.jellyfin.presentation.theme.FindroidTheme
 import dev.jdtech.jellyfin.book.reader.BookFilePreparer
 import dev.jdtech.jellyfin.book.reader.BookProgress
 import dev.jdtech.jellyfin.book.reader.PreparedBook
-import dev.jdtech.jellyfin.repository.DownloadResult
+import dev.jdtech.jellyfin.core.R as CoreR
+import dev.jdtech.jellyfin.databinding.ActivityBookReaderBinding
+import dev.jdtech.jellyfin.presentation.book.components.ReaderAppearanceSheet
+import dev.jdtech.jellyfin.presentation.book.components.ReaderPreferencesState
+import dev.jdtech.jellyfin.presentation.theme.FindroidTheme
 import dev.jdtech.jellyfin.repository.JellyfinRepository
 import dev.jdtech.jellyfin.settings.domain.AppPreferences
 import java.io.IOException
@@ -50,7 +48,6 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import org.readium.r2.navigator.OverflowableNavigator
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
@@ -480,8 +477,7 @@ class BookReaderActivity : AppCompatActivity() {
      * book so a book read on another device resumes near where it was left off.
      */
     private suspend fun restoreLocator(pub: Publication, serverPositionTicks: Long): Locator? {
-        val savedLocatorJson =
-            appPreferences.sharedPreferences.getString(locatorKey(bookId), null)
+        val savedLocatorJson = appPreferences.sharedPreferences.getString(locatorKey(bookId), null)
         val localLocator = savedLocatorJson?.let {
             try {
                 Locator.fromJSON(JSONObject(it))
@@ -503,10 +499,9 @@ class BookReaderActivity : AppCompatActivity() {
     /**
      * Derives a locator from the server's saved position.
      *
-     * For EPUB, Jellyfin uses 10,000,000 ticks (1s) and position is proportion of that.
-     * For Divina (CBZ/CBR/PDF), Jellyfin uses pageCount * 10,000 ticks.
-     * If the server position exceeds runtime ticks but is within the legacy 1,000,000,000 scale,
-     * it falls back to the legacy scale.
+     * For EPUB, Jellyfin uses 10,000,000 ticks (1s) and position is proportion of that. For Divina
+     * (CBZ/CBR/PDF), Jellyfin uses pageCount * 10,000 ticks. If the server position exceeds runtime
+     * ticks but is within the legacy 1,000,000,000 scale, it falls back to the legacy scale.
      */
     private suspend fun locatorFromServerProgress(
         pub: Publication,
@@ -515,7 +510,8 @@ class BookReaderActivity : AppCompatActivity() {
         if (serverPositionTicks <= 0L) return null
 
         val totalTicks = BookProgress.calculateTotalTicks(pub, serverRuntimeTicks)
-        val progression = BookProgress.calculateProgressionFromServerTicks(serverPositionTicks, totalTicks)
+        val progression =
+            BookProgress.calculateProgressionFromServerTicks(serverPositionTicks, totalTicks)
 
         val positions =
             try {
@@ -714,7 +710,12 @@ class BookReaderActivity : AppCompatActivity() {
                     launch {
                         nav.currentLocator
                             .distinctUntilChangedBy {
-                                BookProgress.calculateProgressTicks(it, publication, serverRuntimeTicks).first
+                                BookProgress.calculateProgressTicks(
+                                        it,
+                                        publication,
+                                        serverRuntimeTicks,
+                                    )
+                                    .first
                             }
                             .debounce(PLAYBACK_PROGRESS_DEBOUNCE_MS)
                             .collect { locator -> postProgress(locator) }
@@ -776,7 +777,8 @@ class BookReaderActivity : AppCompatActivity() {
     }
 
     private suspend fun postProgress(locator: Locator) {
-        val (ticks, _) = BookProgress.calculateProgressTicks(locator, publication, serverRuntimeTicks)
+        val (ticks, _) =
+            BookProgress.calculateProgressTicks(locator, publication, serverRuntimeTicks)
         try {
             jellyfinRepository.postPlaybackProgress(bookUUID, ticks, isPaused = false)
         } catch (e: Exception) {
@@ -830,7 +832,8 @@ class BookReaderActivity : AppCompatActivity() {
     override fun onStop() {
         super.onStop()
         navigator?.currentLocator?.value?.let { locator ->
-            val (ticks, progression) = BookProgress.calculateProgressTicks(locator, publication, serverRuntimeTicks)
+            val (ticks, progression) =
+                BookProgress.calculateProgressTicks(locator, publication, serverRuntimeTicks)
             val percent = (progression * 100).toInt().coerceIn(0, 100)
             lifecycleScope.launch(Dispatchers.IO) {
                 try {

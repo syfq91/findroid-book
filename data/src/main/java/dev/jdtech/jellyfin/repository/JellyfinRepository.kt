@@ -160,9 +160,7 @@ interface JellyfinRepository {
     fun getUserId(): UUID
 }
 
-/**
- * The result of an authenticated download request. [stream] is null when [notModified] is true.
- */
+/** The result of an authenticated download request. [stream] is null when [notModified] is true. */
 data class DownloadResult(
     val stream: InputStream?,
     val eTag: String?,
