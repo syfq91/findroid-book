@@ -170,7 +170,7 @@ fun PlayerScreen(
     Box(
         modifier =
             Modifier.dPadEvents(exoPlayer = viewModel.player, videoPlayerState = videoPlayerState)
-                .focusable()
+                .focusable(),
     ) {
         AndroidView(
             factory = { context ->
@@ -184,7 +184,7 @@ fun PlayerScreen(
                         startFromBeginning = startFromBeginning,
                     )
                     playerView.setBackgroundColor(
-                        context.resources.getColor(android.R.color.black, context.theme)
+                        context.resources.getColor(android.R.color.black, context.theme),
                     )
                 }
             },
@@ -299,7 +299,7 @@ private fun SkipButton(
             modifier = Modifier.focusRequester(skipButtonFocusRequester),
             glow =
                 ButtonDefaults.glow(
-                    focusedGlow = Glow(elevationColor = Color.Gray, elevation = 20.dp)
+                    focusedGlow = Glow(elevationColor = Color.Gray, elevation = 20.dp),
                 ),
         ) {
             Icon(

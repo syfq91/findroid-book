@@ -355,7 +355,7 @@ class JellyfinRepositoryImpl(
                     )
                     .content
                     .mediaSources
-                    .map { it.toFindroidSource(this@JellyfinRepositoryImpl, itemId, includePath) }
+                    .map { it.toFindroidSource(this@JellyfinRepositoryImpl, itemId, includePath) },
             )
             sources.addAll(database.getSources(itemId).map { it.toFindroidSource(database) })
             sources
@@ -452,7 +452,7 @@ class JellyfinRepositoryImpl(
                     playMethod = PlayMethod.DIRECT_PLAY,
                     repeatMode = RepeatMode.REPEAT_NONE,
                     playbackOrder = PlaybackOrder.DEFAULT,
-                )
+                ),
             )
         }
     }
@@ -481,7 +481,11 @@ class JellyfinRepositoryImpl(
             }
             try {
                 jellyfinApi.sessionApi.reportPlaybackStopped(
-                    PlaybackStopInfo(itemId = itemId, positionTicks = positionTicks, failed = false)
+                    PlaybackStopInfo(
+                        itemId = itemId,
+                        positionTicks = positionTicks,
+                        failed = false,
+                    ),
                 )
             } catch (_: Exception) {
                 database.setUserDataToBeSynced(jellyfinApi.userId!!, itemId, true)
@@ -508,7 +512,7 @@ class JellyfinRepositoryImpl(
                         repeatMode = RepeatMode.REPEAT_NONE,
                         playbackOrder = PlaybackOrder.DEFAULT,
                         positionTicks = positionTicks,
-                    )
+                    ),
                 )
             } catch (_: Exception) {
                 database.setUserDataToBeSynced(jellyfinApi.userId!!, itemId, true)

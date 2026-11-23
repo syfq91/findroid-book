@@ -26,7 +26,7 @@ fun ProgressBar(item: FindroidItem, width: Int, modifier: Modifier = Modifier) {
                 Modifier.height(4.dp)
                     .width(progress.times(width - 16).dp)
                     .clip(MaterialTheme.shapes.extraSmall)
-                    .background(MaterialTheme.colorScheme.primary)
+                    .background(MaterialTheme.colorScheme.primary),
         )
     }
 }

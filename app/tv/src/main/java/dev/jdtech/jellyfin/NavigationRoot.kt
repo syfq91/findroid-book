@@ -133,7 +133,7 @@ private fun EntryProviderScope<NavKey>.tvEntries(
             onContinueClick =
                 dropUnlessResumed {
                     navigate(if (permissionApplicable) PermissionRoute else ServersRoute)
-                }
+                },
         )
     }
     entry<PermissionRoute> {
@@ -149,12 +149,12 @@ private fun EntryProviderScope<NavKey>.tvEntries(
     }
     entry<ServersRoute> {
         ServersScreen(
-            navigateToUsers = dropUnlessResumed { navigate(UsersRoute) },
+            navigateToUsers = dropUnlessResumed { navigateOrReuse(UsersRoute) },
             onAddClick = dropUnlessResumed { navigate(AddServerRoute) },
         )
     }
     entry<AddServerRoute> {
-        AddServerScreen(onSuccess = dropUnlessResumed { navigate(UsersRoute) })
+        AddServerScreen(onSuccess = dropUnlessResumed { navigateOrReuse(UsersRoute) })
     }
     entry<UsersRoute> {
         UsersScreen(
@@ -195,7 +195,7 @@ private fun EntryProviderScope<NavKey>.tvEntries(
                             libraryId = libraryId.toString(),
                             libraryName = libraryName,
                             libraryType = libraryType,
-                        )
+                        ),
                     )
                 },
             navigateToMovie = resumedAction { itemId -> navigate(MovieRoute(itemId.toString())) },
@@ -203,7 +203,7 @@ private fun EntryProviderScope<NavKey>.tvEntries(
             navigateToPlayer =
                 resumedAction { itemId, itemKind ->
                     navigate(
-                        PlayerRoute(itemId = itemId.toString(), itemKind = itemKind.serialName)
+                        PlayerRoute(itemId = itemId.toString(), itemKind = itemKind.serialName),
                     )
                 },
         )
@@ -220,7 +220,7 @@ private fun EntryProviderScope<NavKey>.tvEntries(
                             libraryId = libraryId.toString(),
                             libraryName = libraryName,
                             libraryType = libraryType,
-                        )
+                        ),
                     )
                 },
             navigateToMovie = resumedAction { itemId -> navigate(MovieRoute(itemId.toString())) },
@@ -236,7 +236,7 @@ private fun EntryProviderScope<NavKey>.tvEntries(
                         PlayerRoute(
                             itemId = itemId.toString(),
                             itemKind = BaseItemKind.MOVIE.serialName,
-                        )
+                        ),
                     )
                 },
         )
@@ -257,7 +257,7 @@ private fun EntryProviderScope<NavKey>.tvEntries(
                         PlayerRoute(
                             itemId = itemId.toString(),
                             itemKind = BaseItemKind.SERIES.serialName,
-                        )
+                        ),
                     )
                 },
         )
@@ -271,7 +271,7 @@ private fun EntryProviderScope<NavKey>.tvEntries(
                         PlayerRoute(
                             itemId = itemId.toString(),
                             itemKind = BaseItemKind.SEASON.serialName,
-                        )
+                        ),
                     )
                 },
         )

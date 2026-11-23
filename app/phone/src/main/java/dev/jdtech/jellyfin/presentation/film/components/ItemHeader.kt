@@ -151,7 +151,7 @@ private fun ItemHeaderBase(
                     Brush.verticalGradient(
                         colors = listOf(Color.Transparent, backgroundColor),
                         startY = 0f,
-                    )
+                    ),
             )
         }
         content()

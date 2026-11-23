@@ -65,7 +65,7 @@ class MPVPlayer(
     private val handler: Handler = Handler(context.mainLooper)
 
     private constructor(
-        builder: Builder
+        builder: Builder,
     ) : this(
         context = builder.context,
         audioAttributes = builder.audioAttributes,
@@ -310,6 +310,8 @@ class MPVPlayer(
 
     // MPV Custom
     private var isPlayerReady: Boolean = false
+    private var released: Boolean = false
+    private var currentSurfaceView: SurfaceView? = null
     private var isSeekable: Boolean = false
     private var currentMediaItemIndex: Int = 0
     private var currentPositionMs: Long? = null
@@ -327,6 +329,7 @@ class MPVPlayer(
 
     override fun eventProperty(property: String, value: String) {
         handler.post {
+            if (released) return@post
             when (property) {
                 "track-list" -> {
                     val newTracks = getTracks(value)
@@ -341,6 +344,7 @@ class MPVPlayer(
 
     override fun eventProperty(property: String, value: Boolean) {
         handler.post {
+            if (released) return@post
             when (property) {
                 "eof-reached" -> {
                     if (value && isPlayerReady) {
@@ -387,6 +391,7 @@ class MPVPlayer(
 
     override fun eventProperty(property: String, value: Long) {
         handler.post {
+            if (released) return@post
             when (property) {
                 "time-pos" -> currentPositionMs = value * C.MILLIS_PER_SECOND
                 "duration" -> {
@@ -426,6 +431,7 @@ class MPVPlayer(
 
     override fun eventProperty(property: String, value: Double) {
         handler.post {
+            if (released) return@post
             when (property) {
                 "speed" -> {
                     playbackParameters = playbackParameters.withSpeed(value.toFloat())
@@ -439,6 +445,7 @@ class MPVPlayer(
 
     override fun event(eventId: Int) {
         handler.post {
+            if (released) return@post
             when (eventId) {
                 MpvEvent.MPV_EVENT_START_FILE -> {
                     if (!isPlayerReady) {
@@ -745,7 +752,7 @@ class MPVPlayer(
                     "${mediaItem.localConfiguration?.uri}",
                     "insert-at",
                     index.toString(),
-                )
+                ),
             )
         }
     }
@@ -847,7 +854,7 @@ class MPVPlayer(
                     "loadfile",
                     "${mediaItem.localConfiguration?.uri}",
                     if (index == 0) "replace" else "append",
-                )
+                ),
             )
         }
         prepareMediaItem(initialIndex)
@@ -1009,7 +1016,11 @@ class MPVPlayer(
             initialSeekTo =
                 if (isPlayerReady) {
                     mpvLib.command(
-                        arrayOf("seek", "${seekTo.toDouble().div(C.MILLIS_PER_SECOND)}", "absolute")
+                        arrayOf(
+                            "seek",
+                            "${seekTo.toDouble().div(C.MILLIS_PER_SECOND)}",
+                            "absolute",
+                        ),
                     )
                     0L
                 } else {
@@ -1032,7 +1043,7 @@ class MPVPlayer(
                         /* flags= */ "auto",
                         /* title= */ "${subtitle.label}",
                         /* lang= */ "${subtitle.language}",
-                    )
+                    ),
                 )
             }
             // Only set the playlist index when the index is not the currently playing item.
@@ -1098,6 +1109,10 @@ class MPVPlayer(
             AudioManagerCompat.abandonAudioFocusRequest(audioManager, audioFocusRequest)
         }
         resetInternalState()
+        released = true
+        // Remove the surface callbacks before destroying mpv.
+        currentSurfaceView?.holder?.removeCallback(surfaceHolder)
+        currentSurfaceView = null
         mpvLib.removeObserver(this)
         mpvLib.destroy()
     }
@@ -1327,6 +1342,8 @@ class MPVPlayer(
      * @param surfaceView The surface view.
      */
     override fun setVideoSurfaceView(surfaceView: SurfaceView?) {
+        currentSurfaceView?.holder?.removeCallback(surfaceHolder)
+        currentSurfaceView = surfaceView
         surfaceView?.holder?.addCallback(surfaceHolder)
     }
 
@@ -1337,7 +1354,10 @@ class MPVPlayer(
      * @param surfaceView The texture view to clear.
      */
     override fun clearVideoSurfaceView(surfaceView: SurfaceView?) {
-        surfaceView?.holder?.removeCallback(surfaceHolder)
+        if (surfaceView === currentSurfaceView) {
+            surfaceView?.holder?.removeCallback(surfaceHolder)
+            currentSurfaceView = null
+        }
     }
 
     /**
@@ -1426,7 +1446,7 @@ class MPVPlayer(
     @Deprecated("Deprecated in Java")
     override fun setDeviceVolume(volume: Int) {
         throw IllegalArgumentException(
-            "You should use global volume controls. Check out AUDIO_SERVICE."
+            "You should use global volume controls. Check out AUDIO_SERVICE.",
         )
     }
 
@@ -1438,13 +1458,13 @@ class MPVPlayer(
     @Deprecated("Deprecated in Java")
     override fun increaseDeviceVolume() {
         throw IllegalArgumentException(
-            "You should use global volume controls. Check out AUDIO_SERVICE."
+            "You should use global volume controls. Check out AUDIO_SERVICE.",
         )
     }
 
     override fun increaseDeviceVolume(flags: Int) {
         throw IllegalArgumentException(
-            "You should use global volume controls. Check out AUDIO_SERVICE."
+            "You should use global volume controls. Check out AUDIO_SERVICE.",
         )
     }
 
@@ -1452,13 +1472,13 @@ class MPVPlayer(
     @Deprecated("Deprecated in Java")
     override fun decreaseDeviceVolume() {
         throw IllegalArgumentException(
-            "You should use global volume controls. Check out AUDIO_SERVICE."
+            "You should use global volume controls. Check out AUDIO_SERVICE.",
         )
     }
 
     override fun decreaseDeviceVolume(flags: Int) {
         throw IllegalArgumentException(
-            "You should use global volume controls. Check out AUDIO_SERVICE."
+            "You should use global volume controls. Check out AUDIO_SERVICE.",
         )
     }
 
@@ -1466,7 +1486,7 @@ class MPVPlayer(
     @Deprecated("Deprecated in Java")
     override fun setDeviceMuted(muted: Boolean) {
         throw IllegalArgumentException(
-            "You should use global volume controls. Check out AUDIO_SERVICE."
+            "You should use global volume controls. Check out AUDIO_SERVICE.",
         )
     }
 
@@ -1592,7 +1612,7 @@ class MPVPlayer(
                     .setLabel(json.optNullableString("title"))
                     .setLanguage(json.optNullableString("lang"))
                     .setSelectionFlags(
-                        if (json.optBoolean("default")) C.SELECTION_FLAG_DEFAULT else 0
+                        if (json.optBoolean("default")) C.SELECTION_FLAG_DEFAULT else 0,
                     )
                     .setCodecs(json.optNullableString("codec"))
                     .build()
@@ -1607,7 +1627,7 @@ class MPVPlayer(
                             .setWidth(json.optInt("demux-w", Format.NO_VALUE))
                             .setHeight(json.optInt("demux-h", Format.NO_VALUE))
                             .setFrameRate(
-                                (json.optNullableDouble("demux-w") ?: Format.NO_VALUE).toFloat()
+                                (json.optNullableDouble("demux-w") ?: Format.NO_VALUE).toFloat(),
                             )
                             .build()
                     }

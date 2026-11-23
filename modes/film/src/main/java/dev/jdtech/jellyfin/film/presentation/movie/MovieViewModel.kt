@@ -54,7 +54,7 @@ constructor(
                         writers = writers,
                         displayExtraInfo = displayExtraInfo,
                         canDeleteFromServer = canDelete,
-                    )
+                    ),
                 )
             } catch (e: Exception) {
                 _state.emit(_state.value.copy(error = e))

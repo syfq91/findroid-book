@@ -105,7 +105,7 @@ class PlayerActivity : BasePlayerActivity() {
                 if (visibility == View.GONE) {
                     hideSystemUI()
                 }
-            }
+            },
         )
 
         val playerControls = binding.playerView.findViewById<View>(R.id.player_controls)
@@ -175,7 +175,7 @@ class PlayerActivity : BasePlayerActivity() {
                                     if (skipButtonTimeoutExpired && currentSegment != null) {
                                         skipSegmentButton.visibility = visibility
                                     }
-                                }
+                                },
                             )
 
                             // Trickplay
@@ -224,7 +224,7 @@ class PlayerActivity : BasePlayerActivity() {
                                     window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                                 } else {
                                     window.clearFlags(
-                                        WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                                        WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
                                     )
                                 }
 
@@ -363,7 +363,7 @@ class PlayerActivity : BasePlayerActivity() {
     private fun finishPlayback() {
         try {
             viewModel.player.clearVideoSurfaceView(
-                binding.playerView.videoSurfaceView as SurfaceView
+                binding.playerView.videoSurfaceView as SurfaceView,
             )
         } catch (e: Exception) {
             Timber.e(e)
@@ -373,7 +373,7 @@ class PlayerActivity : BasePlayerActivity() {
     }
 
     private fun pipParams(
-        enableAutoEnter: Boolean = viewModel.player.isPlaying
+        enableAutoEnter: Boolean = viewModel.player.isPlaying,
     ): PictureInPictureParams {
         val displayAspectRatio = Rational(binding.playerView.width, binding.playerView.height)
 

@@ -51,7 +51,7 @@ constructor(
                         director = director,
                         writers = writers,
                         canDeleteFromServer = canDelete,
-                    )
+                    ),
                 )
             } catch (e: Exception) {
                 _state.emit(_state.value.copy(error = e))

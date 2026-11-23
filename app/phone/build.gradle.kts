@@ -16,6 +16,7 @@ java { toolchain { languageVersion = Versions.JAVA } }
 android {
     namespace = "dev.jdtech.jellyfin"
     compileSdk = Versions.COMPILE_SDK
+    compileSdkMinor = Versions.COMPILE_SDK_MINOR
     buildToolsVersion = Versions.BUILD_TOOLS
 
     defaultConfig {
@@ -104,7 +105,7 @@ androidComponents {
                     .firstOrNull { it.filterType == FilterConfiguration.FilterType.ABI }
                     ?.identifier
             output.outputFileName.set(
-                "findroid-v${output.versionName.get()}-${variant.flavorName}-$abi.apk"
+                "findroid-v${output.versionName.get()}-${variant.flavorName}-$abi.apk",
             )
         }
     }

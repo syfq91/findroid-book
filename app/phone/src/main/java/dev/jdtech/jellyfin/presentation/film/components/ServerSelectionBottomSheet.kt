@@ -12,8 +12,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.rememberStandardBottomSheetState
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,7 +40,7 @@ fun ServerSelectionBottomSheet(
     onUpdate: () -> Unit,
     onManage: () -> Unit,
     onDismissRequest: () -> Unit,
-    sheetState: SheetState = rememberModalBottomSheetState(),
+    sheetState: SheetState,
     viewModel: ServersViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -73,7 +72,7 @@ private fun ServerSelectionBottomSheetLayout(
     onManage: () -> Unit,
     onAction: (action: ServersAction) -> Unit,
     onDismissRequest: () -> Unit,
-    sheetState: SheetState = rememberModalBottomSheetState(),
+    sheetState: SheetState,
 ) {
     ModalBottomSheet(onDismissRequest = onDismissRequest, sheetState = sheetState) {
         LazyColumn(
@@ -120,13 +119,13 @@ private fun ServerSelectionBottomSheetPreview() {
                                 server = dummyServer,
                                 addresses = listOf(dummyServerAddress),
                                 user = null,
-                            )
-                        )
+                            ),
+                        ),
                 ),
             onManage = {},
             onAction = {},
             onDismissRequest = {},
-            sheetState = rememberStandardBottomSheetState(initialValue = SheetValue.Expanded),
+            sheetState = rememberBottomSheetState(initialValue = SheetValue.Expanded),
         )
     }
 }
